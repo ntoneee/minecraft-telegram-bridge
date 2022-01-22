@@ -1,0 +1,2 @@
+telegram-token: ""  # Insert telegram token here (in the form of 12345:AAABCD_DEFG)
+telegram-chat-id: -1  # Insert telegram chat ID here (in the form of -1001234567890)
