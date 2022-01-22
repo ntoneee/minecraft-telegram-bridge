@@ -24,6 +24,7 @@ import java.util.Arrays;
 public class TelegramApi {
     private final TelegramBot bot;
     private final long chat_id;
+    private final long bot_id;
 
     private String getTelegramUserFullName(User user) {
         if (user.lastName() != null) {
@@ -37,7 +38,17 @@ public class TelegramApi {
         if (msg.forwardFrom() != null) { result = "[Переслано от " + getTelegramUserFullName(msg.forwardFrom()) + "] "; }
         else if (msg.forwardFromChat() != null) { result = "[Переслано от " + msg.forwardFromChat().title() + "] "; }
         else if (msg.forwardSenderName() != null) { result = "[Переслано от " + msg.forwardSenderName() + "] "; }
-
+        else if (msg.replyToMessage() != null) {
+            result = "[В ответ на ";
+            //getTelegramUserFullName(msg.replyToMessage().from()) + " \"" + msg.replyToMessage().text() + "\"] "
+            if (msg.replyToMessage().from().id() == bot_id) {
+                result += msg.replyToMessage().text().substring(msg.replyToMessage().text().indexOf(' ') + 1);
+            }
+            else {
+                result += "TG [" + getTelegramUserFullName(msg.replyToMessage().from()) + "] " + msg.replyToMessage().text();
+            }
+            result += "] ";
+        }
         if (msg.viaBot() != null) { result += "[через @" + msg.viaBot().username() + "] "; }
         if (msg.poll() != null) { result += "[Опрос] "; }
         if (msg.dice() != null) { result += "[Кубиковое: " + msg.dice().value() + " очк.] "; }
@@ -86,11 +97,18 @@ public class TelegramApi {
                     String.join(",", names) + "] ";
         }
         // надеюсь за сим все
-        return result;
+        return escapeText(result);
     }
 
     TelegramApi(FileConfiguration config) throws RuntimeException {
-        bot = new TelegramBot(config.getString("telegram-token"));
+        String token = config.getString("telegram-token");
+        bot = new TelegramBot(token);
+        long my_id = 0;
+        for (int i = 0; i < token.length(); ++i) {
+            if (token.charAt(i) == ':') break;
+            my_id = my_id * 10 + token.charAt(i) - '0';
+        }
+        bot_id = my_id;
         chat_id = config.getLong("telegram-chat-id");
         BaseResponse resp = bot.execute(new SendChatAction(chat_id, ChatAction.typing));
         if (!resp.isOk()) {
@@ -100,9 +118,9 @@ public class TelegramApi {
         }
         bot.setUpdatesListener(updates -> {
             for (Update update : updates) {
-                if (update.message() != null) {
+                if (update.message() != null && update.message().chat().id() == chat_id) {
                     String res_text = "[" + ChatColor.AQUA + getTelegramUserFullName(update.message().from()) + ChatColor.RESET +  "] ";
-                    res_text += serializeMessageMeta(update.message());
+                    res_text += ChatColor.ITALIC + serializeMessageMeta(update.message()) + ChatColor.RESET;
                     if (update.message().caption() != null) {
                         res_text += update.message().caption();
                     }
