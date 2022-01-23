@@ -2,6 +2,7 @@ package one.ntonee.mctgbridge;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -90,6 +91,10 @@ public class ActionListener implements Listener {
     public void onAdvancement(PlayerAdvancementDoneEvent e) {
         String advancement_id = String.valueOf(e.getAdvancement().getKey());
         AdvancementMetadata advancement = advancementIDToData.get(advancement_id);
+        if (advancement == null) {
+//            Bukkit.getLogger().info("Advancement " + advancement_id + " not found in JSON, ignoring");
+            return;
+        }
         if (!config.getBoolean("send-advancements." + advancement.type)) {
             return;
         }
