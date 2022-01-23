@@ -142,6 +142,7 @@ public class TelegramApi {
                     else if (update.message().text() != null) {
                         res_text += update.message().text();
                     }
+                    res_text = res_text.replace("\n", "\n> ");
                     Bukkit.broadcastMessage(res_text);
                 }
             }

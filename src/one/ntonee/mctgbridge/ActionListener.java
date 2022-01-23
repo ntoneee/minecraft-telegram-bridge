@@ -1,17 +1,62 @@
 package one.ntonee.mctgbridge;
 
+import com.google.common.reflect.TypeToken;
+import com.google.gson.Gson;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.HashMap;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+class AdvancementMetadata {
+    String title;
+    String description;
+    String type;
+
+    String getFriendlyAction() {
+        String friendlyType;
+        if (Objects.equals(type, "challenge")) {
+            friendlyType = "завершил испытание";
+        }
+        else if (Objects.equals(type, "goal")) {
+            friendlyType = "достиг цели";
+        }
+        else if (Objects.equals(type, "task")) {
+            friendlyType = "выполнил задачу";
+        }
+        else {
+            System.err.println("type: " + type);
+            friendlyType = "получил достижение";
+        }
+        return friendlyType + " " + title;
+    }
+}
+
 public class ActionListener implements Listener {
     private final TelegramApi telegram;
+    private HashMap<String, AdvancementMetadata> advancementIDToData;
+    private final FileConfiguration config;
 
-    ActionListener(TelegramApi telegram) {
+    ActionListener(TelegramApi telegram, FileConfiguration config) {
+        this.config = config;
         this.telegram = telegram;
+        Gson gson = new Gson();
+        InputStream idJSONStream = getClass().getResourceAsStream("/localization/advancements_id-en.json");
+        InputStreamReader reader = new InputStreamReader(idJSONStream);
+        BufferedReader buf = new BufferedReader(reader);
+        advancementIDToData = gson.fromJson(buf.lines().collect(Collectors.joining()), new TypeToken<HashMap<String, AdvancementMetadata>>() {
+        }.getType());
     }
 
     @EventHandler
@@ -39,5 +84,19 @@ public class ActionListener implements Listener {
             deathMessage = e.getEntity().getDisplayName() + " как-то умер";
         }
         telegram.sendMessage("\u2620\uFE0F <b>" + telegram.escapeText(deathMessage) + "</b>");
+    }
+
+    @EventHandler
+    public void onAdvancement(PlayerAdvancementDoneEvent e) {
+        String advancement_id = String.valueOf(e.getAdvancement().getKey());
+        AdvancementMetadata advancement = advancementIDToData.get(advancement_id);
+        if (!config.getBoolean("send-advancements." + advancement.type)) {
+            return;
+        }
+        String message = "\uD83D\uDE0E <b>" + telegram.escapeText(
+                e.getPlayer().getDisplayName() + " " + advancement.getFriendlyAction()
+        ) + "</b>\n\n";
+        message += "<i>" + telegram.escapeText(advancement.description) + "</i>";
+        telegram.sendMessage(message);
     }
 }

@@ -11,7 +11,7 @@ public class Main extends JavaPlugin {
         tg = new TelegramApi(this.getConfig());
         tg.sendMessage("✅ Сервер запущен!");
         Bukkit.getLogger().info("onEnable " + this.getName());
-        getServer().getPluginManager().registerEvents(new ActionListener(tg), this);
+        getServer().getPluginManager().registerEvents(new ActionListener(tg, this.getConfig()), this);
     }
 
     @Override
