@@ -125,8 +125,12 @@ public class TelegramApi {
                             res_text.append(player_cnt != 0 ? ", " : "").append(player.getDisplayName());
                             ++player_cnt;
                         }
+                        if (player_cnt == 0) {
+                            sendMessage("<b>На сервере 0 игроков \uD83D\uDE15</b>");
+                            continue;
+                        }
                         String suffix = (player_cnt % 100 >= 10 && player_cnt % 100 <= 20 || player_cnt % 10 >= 5 || player_cnt % 10 == 0 ? "ов" : player_cnt % 10 == 1 ? "" : "а");
-                        String message = "На сервере " + player_cnt + " игрок" + suffix + ": " + res_text.toString();
+                        String message = "<b>На сервере " + player_cnt + " игрок" + suffix + ": " + escapeText(res_text.toString()) + "</b>";
                         sendMessage(message);
                         continue;
                     }
