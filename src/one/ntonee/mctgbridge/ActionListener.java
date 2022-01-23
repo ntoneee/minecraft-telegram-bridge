@@ -67,24 +67,36 @@ public class ActionListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
+        if (!config.getBoolean("bridge-to-telegram.join-leave")) {
+            return;
+        }
         telegram.sendMessage("<b>\uD83E\uDD73 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
                 " зашёл на сервер" + (!e.getPlayer().hasPlayedBefore() ? " первый раз!</b>" : "</b>"));
     }
 
     @EventHandler
     public void onLeave(PlayerQuitEvent e) {
+        if (!config.getBoolean("bridge-to-telegram.join-leave")) {
+            return;
+        }
         telegram.sendMessage("<b>\uD83D\uDE15 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
                 " покинул сервер</b>");
     }
 
     @EventHandler
     public void onMessage(AsyncPlayerChatEvent e) {
+        if (!config.getBoolean("bridge-to-telegram.messages")) {
+            return;
+        }
         telegram.sendMessage("\uD83D\uDCAC <b>[" + telegram.escapeText(e.getPlayer().getDisplayName()) +
             "]</b> " + telegram.escapeText(e.getMessage()));
     }
 
     @EventHandler
     public void onDeath(PlayerDeathEvent e) {
+        if (!config.getBoolean("bridge-to-telegram.death")) {
+            return;
+        }
         String deathMessage = e.getDeathMessage();
         if (deathMessage == null) {
             deathMessage = e.getEntity().getDisplayName() + " как-то умер";
@@ -100,7 +112,7 @@ public class ActionListener implements Listener {
 //            Bukkit.getLogger().info("Advancement " + advancement_id + " not found in JSON, ignoring");
             return;
         }
-        if (!config.getBoolean("send-advancements." + advancement.type)) {
+        if (!config.getBoolean("bridge-to-telegram.advancements." + advancement.type)) {
             return;
         }
         String message = "<b>" + telegram.escapeText(advancement.getFriendlyAction(e.getPlayer().getDisplayName())) + "</b>\n\n";
