@@ -7,24 +7,22 @@ import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.model.User;
 import com.pengrad.telegrambot.model.request.ChatAction;
 import com.pengrad.telegrambot.model.request.ParseMode;
+import com.pengrad.telegrambot.request.GetMe;
 import com.pengrad.telegrambot.request.SendChatAction;
 import com.pengrad.telegrambot.request.SendMessage;
 import com.pengrad.telegrambot.response.BaseResponse;
-import com.pengrad.telegrambot.response.SendResponse;
-import net.md_5.bungee.api.chat.BaseComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 
-import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 
 public class TelegramApi {
     private final TelegramBot bot;
     private final long chat_id;
     private final long bot_id;
+    private final String bot_username;
 
     private String getTelegramUserFullName(User user) {
         if (user.lastName() != null) {
@@ -50,7 +48,7 @@ public class TelegramApi {
             result += "] ";
         }
         if (msg.viaBot() != null) { result += "[через @" + msg.viaBot().username() + "] "; }
-        if (msg.poll() != null) { result += "[Опрос] "; }
+        if (msg.poll() != null) { result += "[Опрос: " + msg.poll().question() + "] "; }
         if (msg.dice() != null) { result += "[Кубиковое: " + msg.dice().value() + " очк.] "; }
         if (msg.photo() != null) { result += "[Фотография] "; }
         if (msg.sticker() != null) { result += "[Стикер] "; }
@@ -116,9 +114,22 @@ public class TelegramApi {
                     "Maybe you didn't correctly fill config.yml?\n" +
                     "Error description: " + resp.errorCode() + " " + resp.description());
         }
+        bot_username = bot.execute(new GetMe()).user().username();
         bot.setUpdatesListener(updates -> {
             for (Update update : updates) {
                 if (update.message() != null && update.message().chat().id() == chat_id) {
+                    if (Objects.equals(update.message().text(), "/list") || Objects.equals(update.message().text(), "/list@" + bot_username)) {
+                        StringBuilder res_text = new StringBuilder();
+                        int player_cnt = 0;
+                        for (Player player : Bukkit.getOnlinePlayers()) {
+                            res_text.append(player_cnt != 0 ? ", " : "").append(player.getDisplayName());
+                            ++player_cnt;
+                        }
+                        String suffix = (player_cnt % 100 >= 10 && player_cnt % 100 <= 20 || player_cnt % 10 >= 5 || player_cnt % 10 == 0 ? "ов" : player_cnt % 10 == 1 ? "" : "а");
+                        String message = "На сервере " + player_cnt + " игрок" + suffix + ": " + res_text.toString();
+                        sendMessage(message);
+                        continue;
+                    }
                     String res_text = "[" + ChatColor.AQUA + getTelegramUserFullName(update.message().from()) + ChatColor.RESET +  "] ";
                     res_text += ChatColor.ITALIC + serializeMessageMeta(update.message()) + ChatColor.RESET;
                     if (update.message().caption() != null) {
