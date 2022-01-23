@@ -31,6 +31,16 @@ public class TelegramApi {
         return user.firstName();
     }
 
+    private String getMessageText(Message message) {
+        if (message.caption() != null) {
+            return message.caption();
+        }
+        else if (message.text() != null) {
+            return message.text();
+        }
+        return "";
+    }
+
     private String serializeMessageMeta(Message msg) {
         String result = "";
         if (msg.forwardFrom() != null) { result = "[Переслано от " + getTelegramUserFullName(msg.forwardFrom()) + "] "; }
@@ -43,7 +53,7 @@ public class TelegramApi {
                 result += msg.replyToMessage().text().substring(msg.replyToMessage().text().indexOf(' ') + 1);
             }
             else {
-                result += "TG [" + getTelegramUserFullName(msg.replyToMessage().from()) + "] " + msg.replyToMessage().text();
+                result += "TG [" + getTelegramUserFullName(msg.replyToMessage().from()) + "] " + getMessageText(msg.replyToMessage());
             }
             result += "] ";
         }
@@ -136,12 +146,7 @@ public class TelegramApi {
                     }
                     String res_text = "[" + ChatColor.AQUA + getTelegramUserFullName(update.message().from()) + ChatColor.RESET +  "] ";
                     res_text += ChatColor.ITALIC + serializeMessageMeta(update.message()) + ChatColor.RESET;
-                    if (update.message().caption() != null) {
-                        res_text += update.message().caption();
-                    }
-                    else if (update.message().text() != null) {
-                        res_text += update.message().text();
-                    }
+                    res_text += getMessageText(update.message());
                     res_text = res_text.replace("\n", "\n> ");
                     Bukkit.broadcastMessage(res_text);
                 }
