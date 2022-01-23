@@ -25,22 +25,27 @@ class AdvancementMetadata {
     String description;
     String type;
 
-    String getFriendlyAction() {
+    String getFriendlyAction(String username) {
         String friendlyType;
+        String emoji;
         if (Objects.equals(type, "challenge")) {
             friendlyType = "завершил испытание";
+            emoji = "\uD83C\uDFC5";
         }
         else if (Objects.equals(type, "goal")) {
             friendlyType = "достиг цели";
+            emoji = "\uD83C\uDFAF";
         }
         else if (Objects.equals(type, "task")) {
             friendlyType = "выполнил задачу";
+            emoji = "\uD83D\uDCDD";
         }
         else {
             System.err.println("type: " + type);
             friendlyType = "получил достижение";
+            emoji = "\uD83D\uDE3C";
         }
-        return friendlyType + " " + title;
+        return String.join(" ", new String[]{emoji, username, friendlyType, title});
     }
 }
 
@@ -98,9 +103,7 @@ public class ActionListener implements Listener {
         if (!config.getBoolean("send-advancements." + advancement.type)) {
             return;
         }
-        String message = "\uD83D\uDE0E <b>" + telegram.escapeText(
-                e.getPlayer().getDisplayName() + " " + advancement.getFriendlyAction()
-        ) + "</b>\n\n";
+        String message = "<b>" + telegram.escapeText(advancement.getFriendlyAction(e.getPlayer().getDisplayName())) + "</b>\n\n";
         message += "<i>" + telegram.escapeText(advancement.description) + "</i>";
         telegram.sendMessage(message);
     }
