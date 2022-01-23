@@ -1,5 +1,6 @@
 telegram-token: ""  # Insert telegram token here (in the form of 12345:AAABCD_DEFG)
 telegram-chat-id: -1  # Insert telegram chat ID here (in the form of -1001234567890)
+telegram-list-message-id: 0  # Unless zero, updates message with that ID in the chat with actual player list
 
 bridge-to-telegram:
   server-state:

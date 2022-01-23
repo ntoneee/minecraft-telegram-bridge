@@ -7,10 +7,9 @@ import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.model.User;
 import com.pengrad.telegrambot.model.request.ChatAction;
 import com.pengrad.telegrambot.model.request.ParseMode;
-import com.pengrad.telegrambot.request.GetMe;
-import com.pengrad.telegrambot.request.SendChatAction;
-import com.pengrad.telegrambot.request.SendMessage;
+import com.pengrad.telegrambot.request.*;
 import com.pengrad.telegrambot.response.BaseResponse;
+import com.pengrad.telegrambot.response.SendResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -23,6 +22,8 @@ public class TelegramApi {
     private final long chat_id;
     private final long bot_id;
     private final String bot_username;
+    private final int listMessageID;
+    private String previousListContent;
 
     private String getTelegramUserFullName(User user) {
         if (user.lastName() != null) {
@@ -108,8 +109,22 @@ public class TelegramApi {
         return escapeText(result);
     }
 
+    String getListMessage() {
+        StringBuilder res_text = new StringBuilder();
+        int player_cnt = 0;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            res_text.append(player_cnt != 0 ? ", " : "").append(player.getDisplayName());
+            ++player_cnt;
+        }
+        if (player_cnt == 0) {
+            return "\uD83D\uDE15 <b>На сервере 0 игроков</b>";
+        }
+        String suffix = (player_cnt % 100 >= 10 && player_cnt % 100 <= 20 || player_cnt % 10 >= 5 || player_cnt % 10 == 0 ? "ов" : player_cnt % 10 == 1 ? "" : "а");
+        return "\uD83D\uDCDD <b>На сервере " + player_cnt + " игрок" + suffix + ": " + escapeText(res_text.toString()) + "</b>";
+    }
+
     TelegramApi(FileConfiguration config) throws RuntimeException {
-        String token = config.getString("telegram-token");
+        String token = Objects.requireNonNull(config.getString("telegram-token"));
         bot = new TelegramBot(token);
         long my_id = 0;
         for (int i = 0; i < token.length(); ++i) {
@@ -118,6 +133,7 @@ public class TelegramApi {
         }
         bot_id = my_id;
         chat_id = config.getLong("telegram-chat-id");
+        listMessageID = config.getInt("telegram-list-message-id");
         BaseResponse resp = bot.execute(new SendChatAction(chat_id, ChatAction.typing));
         if (!resp.isOk()) {
             throw new RuntimeException("Something went wrong while initializing Telegram API!\n" +
@@ -129,19 +145,7 @@ public class TelegramApi {
             for (Update update : updates) {
                 if (update.message() != null && update.message().chat().id() == chat_id) {
                     if (Objects.equals(update.message().text(), "/list") || Objects.equals(update.message().text(), "/list@" + bot_username)) {
-                        StringBuilder res_text = new StringBuilder();
-                        int player_cnt = 0;
-                        for (Player player : Bukkit.getOnlinePlayers()) {
-                            res_text.append(player_cnt != 0 ? ", " : "").append(player.getDisplayName());
-                            ++player_cnt;
-                        }
-                        if (player_cnt == 0) {
-                            sendMessage("<b>На сервере 0 игроков \uD83D\uDE15</b>");
-                            continue;
-                        }
-                        String suffix = (player_cnt % 100 >= 10 && player_cnt % 100 <= 20 || player_cnt % 10 >= 5 || player_cnt % 10 == 0 ? "ов" : player_cnt % 10 == 1 ? "" : "а");
-                        String message = "<b>На сервере " + player_cnt + " игрок" + suffix + ": " + escapeText(res_text.toString()) + "</b>";
-                        sendMessage(message);
+                        sendMessage(getListMessage());
                         continue;
                     }
                     String res_text = "[" + ChatColor.AQUA + getTelegramUserFullName(update.message().from()) + ChatColor.RESET +  "] ";
@@ -155,8 +159,35 @@ public class TelegramApi {
         });
     }
 
+    void safeCallMethod(BaseRequest request) throws RuntimeException {
+        BaseResponse resp = bot.execute(request);
+        if (!resp.isOk()) {
+            throw new RuntimeException("Telegram API Error: " + resp.errorCode() + " " + resp.description());
+        }
+    }
+
+    void actualizeListMessage() throws RuntimeException {
+        if (listMessageID != 0) {
+            String nowList = getListMessage();
+            if (Objects.equals(nowList, previousListContent)) return;
+            safeCallMethod(new EditMessageText(chat_id, listMessageID, nowList).parseMode(ParseMode.HTML));
+            previousListContent = nowList;
+        }
+    }
+
+    void setListMessage(String text) throws RuntimeException {
+        if (listMessageID != 0 && !Objects.equals(text, previousListContent)) {
+            safeCallMethod(new EditMessageText(chat_id, listMessageID, text).parseMode(ParseMode.HTML));
+            previousListContent = text;
+        }
+    }
+
     void sendMessage(String text) throws RuntimeException {
-        BaseResponse resp = bot.execute(new SendMessage(chat_id, text).parseMode(ParseMode.HTML));
+        sendMessageForce(text);
+    }
+
+    void sendMessageForce(String text) throws RuntimeException {
+        SendResponse resp = bot.execute(new SendMessage(chat_id, text).parseMode(ParseMode.HTML));
         if (!resp.isOk()) {
             throw new RuntimeException("Error sending message: " + resp.description());
         }

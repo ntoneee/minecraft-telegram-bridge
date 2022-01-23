@@ -36,11 +36,7 @@ class AdvancementMetadata {
             friendlyType = "достиг цели";
             emoji = "\uD83C\uDFAF";
         }
-        else if (Objects.equals(type, "task")) {
-            friendlyType = "выполнил задачу";
-            emoji = "\uD83D\uDCDD";
-        }
-        else {
+        else {  // task
             System.err.println("type: " + type);
             friendlyType = "получил достижение";
             emoji = "\uD83D\uDE3C";
@@ -76,11 +72,10 @@ public class ActionListener implements Listener {
 
     @EventHandler
     public void onLeave(PlayerQuitEvent e) {
-        if (!config.getBoolean("bridge-to-telegram.join-leave")) {
-            return;
+        if (config.getBoolean("bridge-to-telegram.join-leave")) {
+            telegram.sendMessage("<b>\uD83D\uDE15 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
+                    " покинул сервер</b>");
         }
-        telegram.sendMessage("<b>\uD83D\uDE15 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
-                " покинул сервер</b>");
     }
 
     @EventHandler

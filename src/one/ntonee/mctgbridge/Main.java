@@ -15,6 +15,12 @@ public class Main extends JavaPlugin {
         }
         Bukkit.getLogger().info("onEnable " + this.getName());
         getServer().getPluginManager().registerEvents(new ActionListener(tg, this.getConfig()), this);
+        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
+            @Override
+            public void run() {
+                tg.actualizeListMessage();
+            }
+        }, 0, 20);
     }
 
     @Override
@@ -22,6 +28,7 @@ public class Main extends JavaPlugin {
         if (this.getConfig().getBoolean("bridge-to-telegram.server-state.disable")) {
             tg.sendMessage("❌ Сервер остановлен!");
         }
+        tg.setListMessage("❌ Сервер остановлен!");
         Bukkit.getLogger().info("on Disable " + this.getName());
     }
 }
