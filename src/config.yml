@@ -1,6 +1,9 @@
 telegram-token: ""  # Insert telegram token here (in the form of 12345:AAABCD_DEFG)
 telegram-chat-id: -1  # Insert telegram chat ID here (in the form of -1001234567890)
+telegram-admin-chat-id: -1  # Insert admin telegram chat ID here (make sure only trusted users have write access to it)
+
 telegram-list-message-id: 0  # Unless zero, updates message with that ID in the chat with actual player list
+pinned-announcement: "[Автообновляется] "
 
 bridge-to-telegram:
   server-state:

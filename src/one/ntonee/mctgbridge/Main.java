@@ -9,7 +9,7 @@ public class Main extends JavaPlugin {
     @Override
     public void onEnable() {
         this.saveDefaultConfig();
-        tg = new TelegramApi(this.getConfig());
+        tg = new TelegramApi(this.getConfig(), this);
         if (this.getConfig().getBoolean("bridge-to-telegram.server-state.enable")) {
             tg.sendMessage("✅ Сервер запущен!");
         }

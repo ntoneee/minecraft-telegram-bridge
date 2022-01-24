@@ -14,16 +14,17 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
 
 public class TelegramApi {
     private final TelegramBot bot;
-    private final long chat_id;
-    private final long bot_id;
+    private final long chatID, adminChatID;
+    private final long botID;
     private final String bot_username;
     private final int listMessageID;
-    private String previousListContent;
+    private String previousPinnedListContent, pinnedListAnnouncement;
 
     private String getTelegramUserFullName(User user) {
         if (user.lastName() != null) {
@@ -50,7 +51,7 @@ public class TelegramApi {
         else if (msg.replyToMessage() != null) {
             result = "[В ответ на ";
             //getTelegramUserFullName(msg.replyToMessage().from()) + " \"" + msg.replyToMessage().text() + "\"] "
-            if (msg.replyToMessage().from().id() == bot_id) {
+            if (msg.replyToMessage().from().id() == botID) {
                 result += msg.replyToMessage().text().substring(msg.replyToMessage().text().indexOf(' ') + 1);
             }
             else {
@@ -109,21 +110,29 @@ public class TelegramApi {
         return escapeText(result);
     }
 
-    String getListMessage() {
+    String getListMessage(boolean includeAnnouncement) {
         StringBuilder res_text = new StringBuilder();
         int player_cnt = 0;
         for (Player player : Bukkit.getOnlinePlayers()) {
             res_text.append(player_cnt != 0 ? ", " : "").append(player.getDisplayName());
             ++player_cnt;
         }
+        String prefix = "\uD83D\uDCDD ";
+        if (includeAnnouncement) {
+            prefix += pinnedListAnnouncement;
+        }
         if (player_cnt == 0) {
-            return "\uD83D\uDE15 <b>На сервере 0 игроков</b>";
+            return prefix + "<b>На сервере 0 игроков</b>";
         }
         String suffix = (player_cnt % 100 >= 10 && player_cnt % 100 <= 20 || player_cnt % 10 >= 5 || player_cnt % 10 == 0 ? "ов" : player_cnt % 10 == 1 ? "" : "а");
-        return "\uD83D\uDCDD <b>На сервере " + player_cnt + " игрок" + suffix + ": " + escapeText(res_text.toString()) + "</b>";
+        return prefix + "<b>На сервере " + player_cnt + " игрок" + suffix + ": " + escapeText(res_text.toString()) + "</b>";
     }
 
-    TelegramApi(FileConfiguration config) throws RuntimeException {
+    boolean checkForCommand(String text, String command) {
+        return text != null && (text.equalsIgnoreCase("/" + command) || text.equalsIgnoreCase("/" + command + "@" + bot_username));
+    }
+
+    TelegramApi(FileConfiguration config, JavaPlugin plugin) throws RuntimeException {
         String token = Objects.requireNonNull(config.getString("telegram-token"));
         bot = new TelegramBot(token);
         long my_id = 0;
@@ -131,10 +140,12 @@ public class TelegramApi {
             if (token.charAt(i) == ':') break;
             my_id = my_id * 10 + token.charAt(i) - '0';
         }
-        bot_id = my_id;
-        chat_id = config.getLong("telegram-chat-id");
+        botID = my_id;
+        chatID = config.getLong("telegram-chat-id");
+        adminChatID = config.getLong("telegram-admin-chat-id");
+        pinnedListAnnouncement = config.getString("pinned-announcement");
         listMessageID = config.getInt("telegram-list-message-id");
-        BaseResponse resp = bot.execute(new SendChatAction(chat_id, ChatAction.typing));
+        BaseResponse resp = bot.execute(new SendChatAction(chatID, ChatAction.typing));
         if (!resp.isOk()) {
             throw new RuntimeException("Something went wrong while initializing Telegram API!\n" +
                     "Maybe you didn't correctly fill config.yml?\n" +
@@ -143,16 +154,36 @@ public class TelegramApi {
         bot_username = bot.execute(new GetMe()).user().username();
         bot.setUpdatesListener(updates -> {
             for (Update update : updates) {
-                if (update.message() != null && update.message().chat().id() == chat_id) {
-                    if (Objects.equals(update.message().text(), "/list") || Objects.equals(update.message().text(), "/list@" + bot_username)) {
-                        sendMessage(getListMessage());
-                        continue;
+                if (update.message() != null) {
+                    if (update.message().chat().id() == chatID) {
+                        if (checkForCommand(update.message().text(), "list")) {
+                            sendMessage(getListMessage(false));
+                            continue;
+                        }
+                        String res_text = "[" + ChatColor.AQUA + getTelegramUserFullName(update.message().from()) + ChatColor.RESET + "] ";
+                        res_text += ChatColor.ITALIC + serializeMessageMeta(update.message()) + ChatColor.RESET;
+                        res_text += getMessageText(update.message());
+                        res_text = res_text.replace("\n", "\n> ");
+                        Bukkit.broadcastMessage(res_text);
                     }
-                    String res_text = "[" + ChatColor.AQUA + getTelegramUserFullName(update.message().from()) + ChatColor.RESET +  "] ";
-                    res_text += ChatColor.ITALIC + serializeMessageMeta(update.message()) + ChatColor.RESET;
-                    res_text += getMessageText(update.message());
-                    res_text = res_text.replace("\n", "\n> ");
-                    Bukkit.broadcastMessage(res_text);
+                    else if (update.message().chat().id() == adminChatID && update.message().text() != null) {
+                        String[] split = update.message().text().split("\\s+", 2);
+                        if (checkForCommand(split[0], "setAnnouncement") && split.length != 1) {
+                            pinnedListAnnouncement = split[1] + " ";
+                            config.set("pinned-announcement", pinnedListAnnouncement);
+                            plugin.saveConfig();
+                            safeCallMethod(new SendMessage(adminChatID, "\u2705"));  // white_check_mark
+                        }
+                        else if (checkForCommand(split[0], "ping")) {
+                            safeCallMethod(new SendMessage(adminChatID, "Pong"));
+                        }
+                        else if (checkForCommand(split[0], "unsetAnnouncement")) {
+                            pinnedListAnnouncement = "";
+                            config.set("pinned-announcement", pinnedListAnnouncement);
+                            plugin.saveConfig();
+                            safeCallMethod(new SendMessage(adminChatID, "\u2705"));  // white_check_mark
+                        }
+                    }
                 }
             }
             return UpdatesListener.CONFIRMED_UPDATES_ALL;
@@ -168,17 +199,17 @@ public class TelegramApi {
 
     void actualizeListMessage() throws RuntimeException {
         if (listMessageID != 0) {
-            String nowList = getListMessage();
-            if (Objects.equals(nowList, previousListContent)) return;
-            safeCallMethod(new EditMessageText(chat_id, listMessageID, nowList).parseMode(ParseMode.HTML));
-            previousListContent = nowList;
+            String nowList = getListMessage(true);
+            if (Objects.equals(nowList, previousPinnedListContent)) return;
+            safeCallMethod(new EditMessageText(chatID, listMessageID, nowList).parseMode(ParseMode.HTML));
+            previousPinnedListContent = nowList;
         }
     }
 
     void setListMessage(String text) throws RuntimeException {
-        if (listMessageID != 0 && !Objects.equals(text, previousListContent)) {
-            safeCallMethod(new EditMessageText(chat_id, listMessageID, text).parseMode(ParseMode.HTML));
-            previousListContent = text;
+        if (listMessageID != 0 && !Objects.equals(text, previousPinnedListContent)) {
+            safeCallMethod(new EditMessageText(chatID, listMessageID, text).parseMode(ParseMode.HTML));
+            previousPinnedListContent = text;
         }
     }
 
@@ -187,7 +218,7 @@ public class TelegramApi {
     }
 
     void sendMessageForce(String text) throws RuntimeException {
-        SendResponse resp = bot.execute(new SendMessage(chat_id, text).parseMode(ParseMode.HTML));
+        SendResponse resp = bot.execute(new SendMessage(chatID, text).parseMode(ParseMode.HTML));
         if (!resp.isOk()) {
             throw new RuntimeException("Error sending message: " + resp.description());
         }
