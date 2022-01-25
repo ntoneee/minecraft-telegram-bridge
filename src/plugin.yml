@@ -1,5 +1,5 @@
 name: Minecraft-Telegram_Bridge
-version: 1.5
+version: 1.6.1
 author: Anton Egorov
 main: one.ntonee.mctgbridge.Main
 api-version: 1.18

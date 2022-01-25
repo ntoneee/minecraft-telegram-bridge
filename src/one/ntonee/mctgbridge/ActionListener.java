@@ -66,12 +66,11 @@ public class ActionListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
-        if (!config.getBoolean("bridge-to-telegram.join-leave")) {
-            return;
+        if (config.getBoolean("bridge-to-telegram.join-leave")) {
+            telegram.sendMessage("<b>\uD83E\uDD73 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
+                    " зашёл на сервер" + (!e.getPlayer().hasPlayedBefore() ? " первый раз!</b>" : "</b>"));
         }
         telegram.actualizeListMessage();
-        telegram.sendMessage("<b>\uD83E\uDD73 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
-                " зашёл на сервер" + (!e.getPlayer().hasPlayedBefore() ? " первый раз!</b>" : "</b>"));
     }
 
     @EventHandler
@@ -80,12 +79,7 @@ public class ActionListener implements Listener {
             telegram.sendMessage("<b>\uD83D\uDE15 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
                     " покинул сервер</b>");
         }
-        Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
-            @Override
-            public void run() {
-                telegram.actualizeListMessage();
-            }
-        }, 1);  // after 1 tick update list
+        Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, telegram::actualizeListMessage, 1);  // after 1 tick update list
     }
 
     @EventHandler
@@ -120,7 +114,7 @@ public class ActionListener implements Listener {
         if (!config.getBoolean("bridge-to-telegram.advancements." + advancement.type)) {
             return;
         }
-        String message = "<b>" + telegram.escapeText(advancement.getFriendlyAction(e.getPlayer().getDisplayName())) + "</b>\n";
+        String message = "<b>" + telegram.escapeText(advancement.getFriendlyAction(e.getPlayer().getDisplayName())) + "</b>\n\n";
         message += "<i>" + telegram.escapeText(advancement.description) + "</i>";
         telegram.sendMessage(message);
     }

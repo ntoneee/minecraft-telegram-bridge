@@ -16,6 +16,10 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 
 public class TelegramApi {
@@ -58,14 +62,8 @@ public class TelegramApi {
         else if (msg.forwardSenderName() != null) { result = "[Переслано от " + msg.forwardSenderName() + "] "; }
         else if (msg.replyToMessage() != null) {
             result = "[В ответ на ";
-            //getTelegramUserFullName(msg.replyToMessage().from()) + " \"" + msg.replyToMessage().text() + "\"] "
             if (msg.replyToMessage().from().id() == botID) {
-                if (msg.replyToMessage().text().length() <= 30) {
-                    result += msg.replyToMessage().text().substring(msg.replyToMessage().text().indexOf(' ') + 1).replace("\n", " / ");
-                }
-                else {
-                    result += "длинное сообщение из игры";
-                }
+                result += msg.replyToMessage().text().substring(msg.replyToMessage().text().indexOf(' ') + 1).replace("\n", " / ");
             }
             else {
                 result += "[" + getTelegramUserFullName(msg.replyToMessage().from()) + "] " + getMessageText(msg.replyToMessage()).replace("\n", " / ");
@@ -120,7 +118,7 @@ public class TelegramApi {
                     String.join(",", names) + "] ";
         }
         // надеюсь за сим все
-        return escapeText(result);
+        return result;
     }
 
     String getListMessage(boolean includeAnnouncement) {
@@ -246,7 +244,8 @@ public class TelegramApi {
     }
 
     void sendMessage(String text) throws RuntimeException {
-        botMessageBuffer.append("\n").append(text);
+        sendMessageForce(text);
+//        botMessageBuffer.append("\n").append(text);
     }
 
     void flushMessageBuffer() {
@@ -255,23 +254,14 @@ public class TelegramApi {
         }
         String toAppend = botMessageBuffer.toString();
         botMessageBuffer.setLength(0);
-        if (lastBotMessageID == -1 || toAppend.length() + rawPreviousBotMessageContent.length() > 4096) {
-            sendMessageForce(toAppend, true);
-            return;
-        }
-        rawPreviousBotMessageContent += toAppend;
-        asyncSafeCallMethod(new EditMessageText(chatID, lastBotMessageID, rawPreviousBotMessageContent).parseMode(ParseMode.HTML));
+        sendMessageForce(toAppend);
     }
 
-    void sendMessageForce(String text, boolean updateLastID) throws RuntimeException {
+    void sendMessageForce(String text) throws RuntimeException {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
             @Override
             public void run() {
-                SendResponse resp = safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML));
-                rawPreviousBotMessageContent = text;
-                if (updateLastID) {
-                    lastBotMessageID = resp.message().messageId();
-                }
+                SendResponse resp = safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML).disableWebPagePreview(true));
             }
         });
     }
