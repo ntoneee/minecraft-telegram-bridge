@@ -186,6 +186,7 @@ public class TelegramApi {
                             pinnedListAnnouncement = split[1] + " ";
                             config.set("pinned-announcement", pinnedListAnnouncement);
                             plugin.saveConfig();
+                            actualizeListMessage();
                             asyncSafeCallMethod(new SendMessage(adminChatID, "\u2705"));  // white_check_mark
                         }
                         else if (checkForCommand(split[0], "ping")) {
@@ -195,6 +196,7 @@ public class TelegramApi {
                             pinnedListAnnouncement = "";
                             config.set("pinned-announcement", pinnedListAnnouncement);
                             plugin.saveConfig();
+                            actualizeListMessage();
                             asyncSafeCallMethod(new SendMessage(adminChatID, "\u2705"));  // white_check_mark
                         }
                     }
