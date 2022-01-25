@@ -11,24 +11,26 @@ public class Main extends JavaPlugin {
         this.saveDefaultConfig();
         tg = new TelegramApi(this.getConfig(), this);
         if (this.getConfig().getBoolean("bridge-to-telegram.server-state.enable")) {
-            tg.sendMessage("✅ Сервер запущен!");
+            tg.sendMessageForce("✅ Сервер запущен!", false);
         }
         Bukkit.getLogger().info("onEnable " + this.getName());
-        getServer().getPluginManager().registerEvents(new ActionListener(tg, this.getConfig()), this);
+        tg.actualizeListMessage();
+        getServer().getPluginManager().registerEvents(new ActionListener(tg, this.getConfig(), this), this);
         Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
             @Override
             public void run() {
-                tg.actualizeListMessage();
+                tg.flushMessageBuffer();
             }
         }, 0, 20);
     }
 
     @Override
     public void onDisable() {
+        tg.flushMessageBuffer();
         if (this.getConfig().getBoolean("bridge-to-telegram.server-state.disable")) {
             tg.sendMessage("❌ Сервер остановлен!");
         }
-        tg.setListMessage("❌ Сервер остановлен!");
+        tg.setListMessage("❌ " + tg.getPinnedListAnnouncement() + "Сервер остановлен!");
         Bukkit.getLogger().info("on Disable " + this.getName());
     }
 }

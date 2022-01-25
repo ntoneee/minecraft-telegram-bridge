@@ -20,11 +20,19 @@ import java.util.*;
 
 public class TelegramApi {
     private final TelegramBot bot;
+    private final JavaPlugin plugin;
     private final long chatID, adminChatID;
     private final long botID;
     private final String bot_username;
     private final int listMessageID;
+    private int lastBotMessageID = -1;
     private String previousPinnedListContent, pinnedListAnnouncement;
+    private String rawPreviousBotMessageContent;
+    private final StringBuilder botMessageBuffer;
+
+    public String getPinnedListAnnouncement() {
+        return pinnedListAnnouncement;
+    }
 
     private String getTelegramUserFullName(User user) {
         if (user.lastName() != null) {
@@ -52,10 +60,15 @@ public class TelegramApi {
             result = "[В ответ на ";
             //getTelegramUserFullName(msg.replyToMessage().from()) + " \"" + msg.replyToMessage().text() + "\"] "
             if (msg.replyToMessage().from().id() == botID) {
-                result += msg.replyToMessage().text().substring(msg.replyToMessage().text().indexOf(' ') + 1);
+                if (msg.replyToMessage().text().length() <= 30) {
+                    result += msg.replyToMessage().text().substring(msg.replyToMessage().text().indexOf(' ') + 1).replace("\n", " / ");
+                }
+                else {
+                    result += "длинное сообщение из игры";
+                }
             }
             else {
-                result += "TG [" + getTelegramUserFullName(msg.replyToMessage().from()) + "] " + getMessageText(msg.replyToMessage());
+                result += "[" + getTelegramUserFullName(msg.replyToMessage().from()) + "] " + getMessageText(msg.replyToMessage()).replace("\n", " / ");
             }
             result += "] ";
         }
@@ -145,17 +158,20 @@ public class TelegramApi {
         adminChatID = config.getLong("telegram-admin-chat-id");
         pinnedListAnnouncement = config.getString("pinned-announcement");
         listMessageID = config.getInt("telegram-list-message-id");
+        botMessageBuffer = new StringBuilder();
+        this.plugin = plugin;
         BaseResponse resp = bot.execute(new SendChatAction(chatID, ChatAction.typing));
         if (!resp.isOk()) {
             throw new RuntimeException("Something went wrong while initializing Telegram API!\n" +
                     "Maybe you didn't correctly fill config.yml?\n" +
                     "Error description: " + resp.errorCode() + " " + resp.description());
         }
-        bot_username = bot.execute(new GetMe()).user().username();
+        bot_username = safeCallMethod(new GetMe()).user().username();
         bot.setUpdatesListener(updates -> {
             for (Update update : updates) {
                 if (update.message() != null) {
                     if (update.message().chat().id() == chatID) {
+                        lastBotMessageID = -1;
                         if (checkForCommand(update.message().text(), "list")) {
                             sendMessage(getListMessage(false));
                             continue;
@@ -172,16 +188,16 @@ public class TelegramApi {
                             pinnedListAnnouncement = split[1] + " ";
                             config.set("pinned-announcement", pinnedListAnnouncement);
                             plugin.saveConfig();
-                            safeCallMethod(new SendMessage(adminChatID, "\u2705"));  // white_check_mark
+                            asyncSafeCallMethod(new SendMessage(adminChatID, "\u2705"));  // white_check_mark
                         }
                         else if (checkForCommand(split[0], "ping")) {
-                            safeCallMethod(new SendMessage(adminChatID, "Pong"));
+                            asyncSafeCallMethod(new SendMessage(adminChatID, "Pong"));
                         }
                         else if (checkForCommand(split[0], "unsetAnnouncement")) {
                             pinnedListAnnouncement = "";
                             config.set("pinned-announcement", pinnedListAnnouncement);
                             plugin.saveConfig();
-                            safeCallMethod(new SendMessage(adminChatID, "\u2705"));  // white_check_mark
+                            asyncSafeCallMethod(new SendMessage(adminChatID, "\u2705"));  // white_check_mark
                         }
                     }
                 }
@@ -190,38 +206,74 @@ public class TelegramApi {
         });
     }
 
-    void safeCallMethod(BaseRequest request) throws RuntimeException {
-        BaseResponse resp = bot.execute(request);
+    <T extends BaseRequest<T, R>, R extends BaseResponse> void asyncSafeCallMethod(BaseRequest<T, R> request) {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
+            @Override
+            public void run() {
+                safeCallMethod(request);
+            }
+        });
+    }
+
+    <T extends BaseRequest<T, R>, R extends BaseResponse> R safeCallMethod(BaseRequest<T, R> request) throws RuntimeException {
+        R resp = bot.execute(request);
         if (!resp.isOk()) {
             throw new RuntimeException("Telegram API Error: " + resp.errorCode() + " " + resp.description());
         }
+        return resp;
     }
 
     void actualizeListMessage() throws RuntimeException {
         if (listMessageID != 0) {
             String nowList = getListMessage(true);
             if (Objects.equals(nowList, previousPinnedListContent)) return;
-            safeCallMethod(new EditMessageText(chatID, listMessageID, nowList).parseMode(ParseMode.HTML));
+            asyncSafeCallMethod(new EditMessageText(chatID, listMessageID, nowList).parseMode(ParseMode.HTML));
             previousPinnedListContent = nowList;
         }
     }
 
     void setListMessage(String text) throws RuntimeException {
         if (listMessageID != 0 && !Objects.equals(text, previousPinnedListContent)) {
-            safeCallMethod(new EditMessageText(chatID, listMessageID, text).parseMode(ParseMode.HTML));
+            EditMessageText request = new EditMessageText(chatID, listMessageID, text).parseMode(ParseMode.HTML);
+            if (plugin.isEnabled()) {
+                asyncSafeCallMethod(request);
+            }
+            else {
+                safeCallMethod(request);
+            }
             previousPinnedListContent = text;
         }
     }
 
     void sendMessage(String text) throws RuntimeException {
-        sendMessageForce(text);
+        botMessageBuffer.append("\n").append(text);
     }
 
-    void sendMessageForce(String text) throws RuntimeException {
-        SendResponse resp = bot.execute(new SendMessage(chatID, text).parseMode(ParseMode.HTML));
-        if (!resp.isOk()) {
-            throw new RuntimeException("Error sending message: " + resp.description());
+    void flushMessageBuffer() {
+        if (botMessageBuffer.isEmpty()) {
+            return;
         }
+        String toAppend = botMessageBuffer.toString();
+        botMessageBuffer.setLength(0);
+        if (lastBotMessageID == -1 || toAppend.length() + rawPreviousBotMessageContent.length() > 4096) {
+            sendMessageForce(toAppend, true);
+            return;
+        }
+        rawPreviousBotMessageContent += toAppend;
+        asyncSafeCallMethod(new EditMessageText(chatID, lastBotMessageID, rawPreviousBotMessageContent).parseMode(ParseMode.HTML));
+    }
+
+    void sendMessageForce(String text, boolean updateLastID) throws RuntimeException {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
+            @Override
+            public void run() {
+                SendResponse resp = safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML));
+                rawPreviousBotMessageContent = text;
+                if (updateLastID) {
+                    lastBotMessageID = resp.message().messageId();
+                }
+            }
+        });
     }
 
     String escapeText(String text) {

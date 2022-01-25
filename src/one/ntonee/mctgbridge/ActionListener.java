@@ -11,6 +11,7 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -49,10 +50,12 @@ public class ActionListener implements Listener {
     private final TelegramApi telegram;
     private HashMap<String, AdvancementMetadata> advancementIDToData;
     private final FileConfiguration config;
+    private final JavaPlugin plugin;
 
-    ActionListener(TelegramApi telegram, FileConfiguration config) {
+    ActionListener(TelegramApi telegram, FileConfiguration config, JavaPlugin plugin) {
         this.config = config;
         this.telegram = telegram;
+        this.plugin = plugin;
         Gson gson = new Gson();
         InputStream idJSONStream = getClass().getResourceAsStream("/localization/advancements_id-en.json");
         InputStreamReader reader = new InputStreamReader(idJSONStream);
@@ -66,6 +69,7 @@ public class ActionListener implements Listener {
         if (!config.getBoolean("bridge-to-telegram.join-leave")) {
             return;
         }
+        telegram.actualizeListMessage();
         telegram.sendMessage("<b>\uD83E\uDD73 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
                 " зашёл на сервер" + (!e.getPlayer().hasPlayedBefore() ? " первый раз!</b>" : "</b>"));
     }
@@ -76,6 +80,12 @@ public class ActionListener implements Listener {
             telegram.sendMessage("<b>\uD83D\uDE15 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
                     " покинул сервер</b>");
         }
+        Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
+            @Override
+            public void run() {
+                telegram.actualizeListMessage();
+            }
+        }, 1);  // after 1 tick update list
     }
 
     @EventHandler
@@ -110,7 +120,7 @@ public class ActionListener implements Listener {
         if (!config.getBoolean("bridge-to-telegram.advancements." + advancement.type)) {
             return;
         }
-        String message = "<b>" + telegram.escapeText(advancement.getFriendlyAction(e.getPlayer().getDisplayName())) + "</b>\n\n";
+        String message = "<b>" + telegram.escapeText(advancement.getFriendlyAction(e.getPlayer().getDisplayName())) + "</b>\n";
         message += "<i>" + telegram.escapeText(advancement.description) + "</i>";
         telegram.sendMessage(message);
     }
