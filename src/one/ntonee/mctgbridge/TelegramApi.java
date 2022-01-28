@@ -10,7 +10,6 @@ import com.pengrad.telegrambot.model.request.ParseMode;
 import com.pengrad.telegrambot.request.*;
 import com.pengrad.telegrambot.response.BaseResponse;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
