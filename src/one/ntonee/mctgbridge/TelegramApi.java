@@ -9,30 +9,23 @@ import com.pengrad.telegrambot.model.request.ChatAction;
 import com.pengrad.telegrambot.model.request.ParseMode;
 import com.pengrad.telegrambot.request.*;
 import com.pengrad.telegrambot.response.BaseResponse;
-import com.pengrad.telegrambot.response.SendResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
 
-import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 
 public class TelegramApi {
     private final TelegramBot bot;
-    private final JavaPlugin plugin;
+    private final Main plugin;
     private final long chatID, adminChatID;
     private final long botID;
     private final String bot_username;
     private final int listMessageID;
-    private int lastBotMessageID = -1;
     private String previousPinnedListContent, pinnedListAnnouncement;
-    private String rawPreviousBotMessageContent;
     private final StringBuilder botMessageBuffer;
+    private final LangConfiguration lang;
 
     public String getPinnedListAnnouncement() {
         return pinnedListAnnouncement;
@@ -57,93 +50,136 @@ public class TelegramApi {
 
     private String serializeMessageMeta(Message msg) {
         String result = "";
-        if (msg.forwardFrom() != null) { result = "[Переслано от " + getTelegramUserFullName(msg.forwardFrom()) + "] "; }
-        else if (msg.forwardFromChat() != null) { result = "[Переслано от " + msg.forwardFromChat().title() + "] "; }
-        else if (msg.forwardSenderName() != null) { result = "[Переслано от " + msg.forwardSenderName() + "] "; }
+        if (msg.forwardFrom() != null) {
+            result = lang.formatMessageMetaString("forward", "forwardFrom", getTelegramUserFullName(msg.forwardFrom()));
+        }
+        else if (msg.forwardFromChat() != null) {
+            result = lang.formatMessageMetaString("forward", "forwardFrom", msg.forwardFromChat().title());
+        }
+        else if (msg.forwardSenderName() != null) {
+            result = lang.formatMessageMetaString("forward", "forwardFrom", msg.forwardSenderName());
+        }
         else if (msg.replyToMessage() != null) {
-            result = "[В ответ на ";
+            HashMap<String, String> substituteValues = new HashMap<>(Map.of(
+                    "replySender", getTelegramUserFullName(msg.replyToMessage().from()),
+                    "replyText", getMessageText(msg.replyToMessage()).replace("\n",
+                            Objects.requireNonNull(lang.getString("minecraft.reply-newline-replacement")))
+            ));
             if (msg.replyToMessage().from().id() == botID) {
-                result += msg.replyToMessage().text().substring(msg.replyToMessage().text().indexOf(' ') + 1).replace("\n", " / ");
+                substituteValues.put("replyTextAfterSpace",
+                        substituteValues.get("replyText").substring(substituteValues.get("replyText").indexOf(' ')));
+                result = lang.formatMessageMetaString("reply-minecraft", substituteValues);
             }
             else {
-                result += "[" + getTelegramUserFullName(msg.replyToMessage().from()) + "] " + getMessageText(msg.replyToMessage()).replace("\n", " / ");
+                result = lang.formatMessageMetaString("reply", substituteValues);
             }
-            result += "] ";
         }
-        if (msg.viaBot() != null) { result += "[через @" + msg.viaBot().username() + "] "; }
-        if (msg.poll() != null) { result += "[Опрос: " + msg.poll().question() + "] "; }
-        if (msg.dice() != null) { result += "[Кубиковое: " + msg.dice().value() + " очк.] "; }
-        if (msg.photo() != null) { result += "[Фотография] "; }
-        if (msg.sticker() != null) { result += "[Стикер] "; }
-        if (msg.animation() != null) { result += "[GIF] "; }
-        else if (msg.document() != null) { result += "[Файл] "; }
-        if (msg.audio() != null) { result += "[Аудио] "; }
-        if (msg.video() != null) { result += "[Видео] "; }
-        if (msg.videoNote() != null) { result += "[Видеосообщение] "; }
-        if (msg.voice() != null) { result += "[Голосовое сообщение] "; }
-        if (msg.contact() != null) { result += "[Контакт] "; }
-        if (msg.game() != null) { result += "[Игра] "; }
-        if (msg.venue() != null) { result += "[Venue] "; }
-        if (msg.location() != null) { result += "[Геолокация] "; }
-        if (msg.pinnedMessage() != null) { result += "[закрепляет сообщение] "; }
+        if (msg.viaBot() != null) {
+            result += lang.formatMessageMetaString("via-bot", "viaBotUsername", msg.viaBot().username());
+        }
+        if (msg.poll() != null) {
+            result += lang.formatMessageMetaString("poll", "pollQuestion", msg.poll().question());
+        }
+        if (msg.dice() != null) {
+            result += lang.formatMessageMetaString("dice", "diceValue", String.valueOf(msg.dice().value()));
+        }
+        if (msg.photo() != null) { result += lang.getMessageMetaString("photo"); }
+        if (msg.sticker() != null) { result += lang.getMessageMetaString("sticker"); }
+        if (msg.animation() != null) { result += lang.getMessageMetaString("gif"); }
+        else if (msg.document() != null) { result += lang.getMessageMetaString("file"); }
+        if (msg.audio() != null) { result += lang.getMessageMetaString("audio"); }
+        if (msg.video() != null) { result += lang.getMessageMetaString("video"); }
+        if (msg.videoNote() != null) { result += lang.getMessageMetaString("videomessage"); }
+        if (msg.voice() != null) { result += lang.getMessageMetaString("voicemessage"); }
+        if (msg.contact() != null) { result += lang.getMessageMetaString("contact"); }
+        if (msg.game() != null) { result += lang.getMessageMetaString("game"); }
+        if (msg.venue() != null) { result += lang.getMessageMetaString("venue"); }
+        if (msg.location() != null) { result += lang.getMessageMetaString("geo"); }
+        if (msg.pinnedMessage() != null) { result += lang.getMessageMetaString("pin"); }
         if (msg.newChatMembers() != null) {
             ArrayList<String> names = new ArrayList<>();
             for (User user : msg.newChatMembers()) {
                 names.add(getTelegramUserFullName(user));
             }
-            result += "[добавляет пользовател" + (msg.newChatMembers().length == 1 ? "я " : "ей ") + String.join(",", names) + "] ";
+            String joint_names = String.join(",", names);
+
+            if (msg.newChatMembers().length == 1) {
+                result += lang.formatMessageMetaString("invite-one", "userInvited", joint_names);
+            }
+            else {
+                result += lang.formatMessageMetaString("invite-many", "usersInvited", joint_names);
+            }
         }
         if (msg.newChatTitle() != null) {
-            result += "[меняет название чата на " + msg.newChatTitle() + "] ";
+            result += lang.formatMessageMetaString("change-title", "newTitle", msg.newChatTitle());
         }
         if (msg.newChatPhoto() != null) {
-            result += "[меняет фото чата] ";
+            result += lang.getMessageMetaString("change-photo");
         }
         if (msg.voiceChatScheduled() != null) {
-            result += "[запланировал голосовой чат] ";
+            result += lang.getMessageMetaString("schedule-voice-chat");
         }
         if (msg.voiceChatStarted() != null) {
-            result += "[начинает голосовой чат] ";
+            result += lang.getMessageMetaString("start-voice-chat");
         }
         if (msg.voiceChatEnded() != null) {
-            result += "[завершает голосовой чат] ";
+            result += lang.getMessageMetaString("finish-voice-chat");
         }
         if (msg.voiceChatParticipantsInvited() != null) {
             ArrayList<String> names = new ArrayList<>();
             for (User user : msg.voiceChatParticipantsInvited().users()) {
                 names.add(getTelegramUserFullName(user));
             }
-            result += "[приглашает в ГЧ пользовател" +
-                    (msg.voiceChatParticipantsInvited().users().size() == 1 ? "я " : "ей ") +
-                    String.join(",", names) + "] ";
+            String joint_names = String.join(",", names);
+
+            if (names.size() == 1) {
+                result += lang.formatMessageMetaString("invite-one-voice-chat", "userInvited", joint_names);
+            }
+            else {
+                result += lang.formatMessageMetaString("invite-many-voice-chat", "usersInvited", joint_names);
+            }
         }
-        // надеюсь за сим все
         return result;
     }
 
     String getListMessage(boolean includeAnnouncement) {
-        StringBuilder res_text = new StringBuilder();
+        StringBuilder names = new StringBuilder();
         int player_cnt = 0;
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            res_text.append(player_cnt != 0 ? ", " : "").append(player.getDisplayName());
+        for (Player player: Bukkit.getOnlinePlayers()) {
+            if (player_cnt != 0) {
+                names.append(", ");
+            }
+            names.append(player.getDisplayName());
             ++player_cnt;
         }
-        String prefix = "\uD83D\uDCDD ";
-        if (includeAnnouncement) {
-            prefix += pinnedListAnnouncement;
-        }
+        String joint_names = names.toString();
         if (player_cnt == 0) {
-            return prefix + "<b>На сервере 0 игроков</b>";
+            if (includeAnnouncement) {
+                return lang.formatString("telegram.announcement-message.server-enabled-zero-online",
+                        "announcement", pinnedListAnnouncement);
+            }
+            return lang.getString("telegram.zero-online");
         }
-        String suffix = (player_cnt % 100 >= 10 && player_cnt % 100 <= 20 || player_cnt % 10 >= 5 || player_cnt % 10 == 0 ? "ов" : player_cnt % 10 == 1 ? "" : "а");
-        return prefix + "<b>На сервере " + player_cnt + " игрок" + suffix + ": " + escapeText(res_text.toString()) + "</b>";
+        if (includeAnnouncement) {
+            return lang.formatString("telegram.announcement-message.server-enabled", Map.of(
+                    "announcement", pinnedListAnnouncement,
+                    "onlineCount", String.valueOf(player_cnt),
+                    "onlinePlayers", joint_names
+            ));
+        }
+        else {
+            return lang.formatString("telegram.list", Map.of(
+                    "onlineCount", String.valueOf(player_cnt),
+                    "onlinePlayers", joint_names
+            ));
+        }
     }
 
     boolean checkForCommand(String text, String command) {
         return text != null && (text.equalsIgnoreCase("/" + command) || text.equalsIgnoreCase("/" + command + "@" + bot_username));
     }
 
-    TelegramApi(FileConfiguration config, JavaPlugin plugin) throws RuntimeException {
+    TelegramApi(FileConfiguration config, Main plugin) throws RuntimeException {
         String token = Objects.requireNonNull(config.getString("telegram-token"));
         bot = new TelegramBot(token);
         long my_id = 0;
@@ -158,6 +194,7 @@ public class TelegramApi {
         listMessageID = config.getInt("telegram-list-message-id");
         botMessageBuffer = new StringBuilder();
         this.plugin = plugin;
+        lang = plugin.getLangConfig();
         BaseResponse resp = bot.execute(new SendChatAction(chatID, ChatAction.typing));
         if (!resp.isOk()) {
             throw new RuntimeException("Something went wrong while initializing Telegram API!\n" +
@@ -169,16 +206,17 @@ public class TelegramApi {
             for (Update update : updates) {
                 if (update.message() != null) {
                     if (update.message().chat().id() == chatID) {
-                        lastBotMessageID = -1;
                         if (checkForCommand(update.message().text(), "list")) {
                             sendMessage(getListMessage(false));
                             continue;
                         }
-                        String res_text = "[" + ChatColor.AQUA + getTelegramUserFullName(update.message().from()) + ChatColor.RESET + "] ";
-                        res_text += ChatColor.ITALIC + serializeMessageMeta(update.message()) + ChatColor.RESET;
-                        res_text += getMessageText(update.message());
-                        res_text = res_text.replace("\n", "\n> ");
-                        Bukkit.broadcastMessage(res_text);
+                        Bukkit.broadcastMessage(lang.formatString("minecraft.base-message", Map.of(
+                                "senderName", getTelegramUserFullName(update.message().from()),
+                                "messageMeta", serializeMessageMeta(update.message()),
+                                "messageText",
+                                getMessageText(update.message()).replace("\n",
+                                        lang.getString("minecraft.message-newline-replacement"))
+                        )));
                     }
                     else if (update.message().chat().id() == adminChatID && update.message().text() != null) {
                         String[] split = update.message().text().split("\\s+", 2);
@@ -207,12 +245,7 @@ public class TelegramApi {
     }
 
     <T extends BaseRequest<T, R>, R extends BaseResponse> void asyncSafeCallMethod(BaseRequest<T, R> request) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
-            @Override
-            public void run() {
-                safeCallMethod(request);
-            }
-        });
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> safeCallMethod(request));
     }
 
     <T extends BaseRequest<T, R>, R extends BaseResponse> R safeCallMethod(BaseRequest<T, R> request) throws RuntimeException {
@@ -260,11 +293,9 @@ public class TelegramApi {
     }
 
     void sendMessageForce(String text) throws RuntimeException {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
-            @Override
-            public void run() {
-                SendResponse resp = safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML).disableWebPagePreview(true));
-            }
+        // This method used to set lastBotMessageID variable, that is why asyncSafeCallMethod is not used
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML).disableWebPagePreview(true));
         });
     }
 

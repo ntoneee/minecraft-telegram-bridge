@@ -1,0 +1,94 @@
+telegram:
+  # Messages to Telegram templates
+  # You can use simple HTML formatting here, read more on https://core.telegram.org/bots/api#html-style
+
+  # Constant strings
+  server-state:
+    enable: "✅ Сервер запущен!"
+    disable: "❌ Сервер остановлен!"
+
+  # Common variables: {userDisplayName}
+  player-event:
+    join: "<b>\uD83E\uDD73 {userDisplayName} зашёл на сервер"
+    join-first-time: "<b>\uD83E\uDD73 {userDisplayName} зашёл на сервер в первый раз!"
+    leave: "<b>\uD83D\uDE15 {userDisplayName} покинул сервер</b>"
+    # Variable: {deathMessage} for death message, e.g. `Steve fell from a high place`
+    death: "\u2620\uFE0F <b>{deathMessage}</b>"
+    # Variable: {message} for the message sent
+    message: "💬 <b>[{userDisplayName}]</b> {message}"
+    # Advancement congratulation strings are stored separately for each advancement level, in level decreasing order
+    # Now only BlazeandCave's Advancement Pack is supported, vanilla advancements without that data pack may be shown incorrectly.
+    # Variables: {advancementTitle} for advancement title and {advancementDescription} for detailed description
+    advancement:
+      challenge: "<b>🏅 {userDisplayName} завершил испытание {advancementTitle}</b>\n\n<i>{advancementDescription}</i>"
+      goal: "<b>🎯 {userDisplayName} достиг цели {advancementTitle}</b>\n\n<i>{advancementDescription}</i>"
+      task: "<b>😼 {userDisplayName} получил достижение {advancementTitle}</b>\n\n<i>{advancementDescription}</i>"
+
+  # This section matters when in config.yml telegram-list-message-id is non-zero.
+  # Variables: {announcement} - announcement set by admins in config.yml or using /setAnnouncement in admin chat
+  announcement-message:
+    server-disabled: "❌ {announcement}Сервер остановлен!"
+    # Variables: onlineCount - count of players online, onlinePlayers - comma-separated display names of online people.
+    server-enabled: "📝 {announcement}Онлайн {onlineCount}: {onlinePlayers}"
+    server-enabled-zero-online:  "📝 {announcement}Онлайн 0"
+
+  list: "📝 Онлайн {onlineCount}: {onlinePlayers}"
+  zero-online: "📝 Онлайн 0"
+
+minecraft:
+  # Messages to Minecraft templates
+  # Variable {colorx} - ChatColor.getByChar(x), e.g. {colorb} will result in Aqua color code, {colorr} in Reset color code.
+  # Read about colors on https://minecraft.fandom.com/wiki/Formatting_codes. Ignore § sign in color and format codes there.
+  # Other variables: {senderName} - first and last name of Telegram message sender;
+  # - {messageMeta} - message non-text data (e.g. changed chat title, sent photo, sticker or dice)
+  # - {messageText} - message text or caption (chosen automatically based on what is present)
+  base-message: "[{colorb}{senderName}{colorr}] {coloro}{messageMeta}{colorr}{messageText}"
+  # Notice that plugin will insert a space after each entry, so no space between {messageMeta} and {messageText} is needed
+  # Better display newlines in texts of message and replies
+  reply-newline-replacement: " / "
+  message-newline-replacement: "\n> "
+  message-meta:
+    # All entries will be present if applicable
+
+    # {forwardFrom} is the name of the user or channel the message is forwarded from
+    forward: "[Переслано от {forwardFrom}]"
+    # In replies, variables {replySender} and {replyText} are present,
+    # pointing to sender of the message that is replied to and the text of such message correspondingly.
+    # This handles replies to the plugin messages
+    # Just in case bot messages are prepended with an emoji and a space,
+    # special variable is present: {replyTextAfterSpace}, which takes a substring after the first space of the {replyText}
+    reply-minecraft: "[В ответ на {replyTextAfterSpace}]"
+    # This handles all the other replies. Variables are the same EXCEPT OF {replyTextAfterSpace}
+    reply: "[В ответ на [{replySender}] {replyText}]"
+    # Variable: {viaBotUsername} - the username of the bot via which the message is sent
+    via-bot: "[через @{viaBotUsername}]"
+    # Variable: {pollQuestion} - the question of the poll
+    poll: "[Опрос: {pollQuestion}]"
+    # Variable: {diceValue} - result of the dice (e.g. for dart it is in [0; 5])
+    dice: "[Кубик: {diceValue}]"
+    photo: "[Фотография]"
+    sticker: "[Стикер]"
+    gif: "[GIF]"
+    file: "[Файл]"
+    audio: "[Аудио]"
+    video: "[Видео]"
+    videomessage: "[Видеосообщение]"
+    voicemessage: "[Голосовое сообщение]"
+    contact: "[Контакт]"
+    game: "[Игра]"
+    venue: "[Venue]"
+    geo: "[Геолокация]"
+    pin: "[закрепляет сообщение]"
+    # Variable: {userInvited} - first and last name of user invited
+    invite-one: "[добавляет пользователя {userInvited}]"
+    # Variable: {usersInvited} - comma-separated list of users invited in the format below
+    invite-many: "[добавляет пользователей {usersInvited}]"
+    # Variable: {newTitle} - new chat title
+    change-title: "[меняет название чата на {newTitle}]"
+    change-photo: "[меняет фото чата]"
+    schedule-voice-chat: "[запланировал голосовой чат]"
+    start-voice-chat: "[начинает голосовой чат]"
+    finish-voice-chat: "[завершает голосовой чат]"
+    # Variables the same as in invite-one and invite-many correspondingly
+    invite-one-voice-chat: "[приглашает в ГЧ пользователя {userInvited}]"
+    invite-many-voice-chat: "[приглашает в ГЧ пользователей {usersInvited}]"

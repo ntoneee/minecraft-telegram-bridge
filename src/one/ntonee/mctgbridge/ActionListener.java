@@ -11,64 +11,44 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.HashMap;
-import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 class AdvancementMetadata {
     String title;
     String description;
     String type;
-
-    String getFriendlyAction(String username) {
-        String friendlyType;
-        String emoji;
-        if (Objects.equals(type, "challenge")) {
-            friendlyType = "завершил испытание";
-            emoji = "\uD83C\uDFC5";
-        }
-        else if (Objects.equals(type, "goal")) {
-            friendlyType = "достиг цели";
-            emoji = "\uD83C\uDFAF";
-        }
-        else {  // task
-            System.err.println("type: " + type);
-            friendlyType = "получил достижение";
-            emoji = "\uD83D\uDE3C";
-        }
-        return String.join(" ", new String[]{emoji, username, friendlyType, title});
-    }
 }
 
 public class ActionListener implements Listener {
     private final TelegramApi telegram;
     private HashMap<String, AdvancementMetadata> advancementIDToData;
     private final FileConfiguration config;
-    private final JavaPlugin plugin;
+    private final Main plugin;
+    private final LangConfiguration lang;
 
-    ActionListener(TelegramApi telegram, FileConfiguration config, JavaPlugin plugin) {
+    ActionListener(TelegramApi telegram, FileConfiguration config, Main plugin) {
         this.config = config;
         this.telegram = telegram;
         this.plugin = plugin;
+        this.lang = plugin.getLangConfig();
         Gson gson = new Gson();
-        InputStream idJSONStream = getClass().getResourceAsStream("/localization/advancements_id-en.json");
-        InputStreamReader reader = new InputStreamReader(idJSONStream);
-        BufferedReader buf = new BufferedReader(reader);
-        advancementIDToData = gson.fromJson(buf.lines().collect(Collectors.joining()), new TypeToken<HashMap<String, AdvancementMetadata>>() {
+        String advancements = plugin.readResourceFile("/localization/advancements_id-en.json");
+        advancementIDToData = gson.fromJson(advancements, new TypeToken<HashMap<String, AdvancementMetadata>>() {
         }.getType());
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
         if (config.getBoolean("bridge-to-telegram.join-leave")) {
-            telegram.sendMessage("<b>\uD83E\uDD73 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
-                    " зашёл на сервер" + (!e.getPlayer().hasPlayedBefore() ? " первый раз!</b>" : "</b>"));
+            String langPathJoinEvent = "telegram.player-event.join";
+            if (!e.getPlayer().hasPlayedBefore()) {
+                langPathJoinEvent += "-first-time";
+            }
+            telegram.sendMessage(lang.formatString(langPathJoinEvent,
+                    "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
+
         }
         telegram.actualizeListMessage();
     }
@@ -76,8 +56,8 @@ public class ActionListener implements Listener {
     @EventHandler
     public void onLeave(PlayerQuitEvent e) {
         if (config.getBoolean("bridge-to-telegram.join-leave")) {
-            telegram.sendMessage("<b>\uD83D\uDE15 " + telegram.escapeText(e.getPlayer().getDisplayName()) +
-                    " покинул сервер</b>");
+            telegram.sendMessage(lang.formatString("telegram.player-event.leave",
+                    "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
         }
         Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, telegram::actualizeListMessage, 1);  // after 1 tick update list
     }
@@ -87,8 +67,10 @@ public class ActionListener implements Listener {
         if (!config.getBoolean("bridge-to-telegram.messages")) {
             return;
         }
-        telegram.sendMessage("\uD83D\uDCAC <b>[" + telegram.escapeText(e.getPlayer().getDisplayName()) +
-            "]</b> " + telegram.escapeText(e.getMessage()));
+        telegram.sendMessage(lang.formatString("telegram.player-event.message", Map.of(
+                "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName()),
+                "message", telegram.escapeText(e.getMessage())
+        )));
     }
 
     @EventHandler
@@ -97,10 +79,10 @@ public class ActionListener implements Listener {
             return;
         }
         String deathMessage = e.getDeathMessage();
-        if (deathMessage == null) {
-            deathMessage = e.getEntity().getDisplayName() + " как-то умер";
+        if (deathMessage == null) {  // Fallback, since getDeathMessage is nullable. No known way to reproduce null.
+            deathMessage = e.getEntity().getDisplayName() + " died";
         }
-        telegram.sendMessage("\u2620\uFE0F <b>" + telegram.escapeText(deathMessage) + "</b>");
+        telegram.sendMessage(lang.formatString("telegram.player-event.death", "deathMessage", deathMessage));
     }
 
     @EventHandler
@@ -108,14 +90,16 @@ public class ActionListener implements Listener {
         String advancement_id = String.valueOf(e.getAdvancement().getKey());
         AdvancementMetadata advancement = advancementIDToData.get(advancement_id);
         if (advancement == null) {
-//            Bukkit.getLogger().info("Advancement " + advancement_id + " not found in JSON, ignoring");
             return;
         }
         if (!config.getBoolean("bridge-to-telegram.advancements." + advancement.type)) {
             return;
         }
-        String message = "<b>" + telegram.escapeText(advancement.getFriendlyAction(e.getPlayer().getDisplayName())) + "</b>\n\n";
-        message += "<i>" + telegram.escapeText(advancement.description) + "</i>";
+        String message = lang.formatString("telegram.player-event.advancement." + advancement.type, Map.of(
+                "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName()),
+                "advancementTitle", telegram.escapeText(advancement.title),
+                "advancementDescription", telegram.escapeText(advancement.description)
+        ));
         telegram.sendMessage(message);
     }
 }
