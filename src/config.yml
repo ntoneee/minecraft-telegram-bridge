@@ -13,7 +13,6 @@ bridge-to-telegram:
   death: true
   advancements:
     goal: true
-    advancement: false
     challenge: true
     task: false
   messages: true

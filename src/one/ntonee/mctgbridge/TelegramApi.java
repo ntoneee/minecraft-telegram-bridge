@@ -291,10 +291,14 @@ public class TelegramApi {
         sendMessageForce(toAppend);
     }
 
-    void sendMessageForce(String text) throws RuntimeException {
+    void syncSendMessageForce(String text) throws RuntimeException {
+        safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML).disableWebPagePreview(true));
+    }
+
+    void sendMessageForce(String text) {
         // This method used to set lastBotMessageID variable, that is why asyncSafeCallMethod is not used
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML).disableWebPagePreview(true));
+            syncSendMessageForce(text);
         });
     }
 

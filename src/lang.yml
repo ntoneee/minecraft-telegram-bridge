@@ -4,13 +4,13 @@ telegram:
 
   # Constant strings
   server-state:
-    enable: "✅ Сервер запущен!"
-    disable: "❌ Сервер остановлен!"
+    enable: "✅ <b>Сервер запущен!</b>"
+    disable: "❌ <b>Сервер остановлен!</b>"
 
   # Common variables: {userDisplayName}
   player-event:
-    join: "<b>\uD83E\uDD73 {userDisplayName} зашёл на сервер"
-    join-first-time: "<b>\uD83E\uDD73 {userDisplayName} зашёл на сервер в первый раз!"
+    join: "<b>\uD83E\uDD73 {userDisplayName} зашёл на сервер</b>"
+    join-first-time: "<b>\uD83E\uDD73 {userDisplayName} зашёл на сервер в первый раз!</b>"
     leave: "<b>\uD83D\uDE15 {userDisplayName} покинул сервер</b>"
     # Variable: {deathMessage} for death message, e.g. `Steve fell from a high place`
     death: "\u2620\uFE0F <b>{deathMessage}</b>"
@@ -27,13 +27,13 @@ telegram:
   # This section matters when in config.yml telegram-list-message-id is non-zero.
   # Variables: {announcement} - announcement set by admins in config.yml or using /setAnnouncement in admin chat
   announcement-message:
-    server-disabled: "❌ {announcement}Сервер остановлен!"
+    server-disabled: "❌ <b>{announcement}Сервер остановлен!</b>"
     # Variables: onlineCount - count of players online, onlinePlayers - comma-separated display names of online people.
-    server-enabled: "📝 {announcement}Онлайн {onlineCount}: {onlinePlayers}"
-    server-enabled-zero-online:  "📝 {announcement}Онлайн 0"
+    server-enabled: "📝 <b>{announcement}Онлайн {onlineCount}: {onlinePlayers}</b>"
+    server-enabled-zero-online:  "📝 <b>{announcement}Онлайн 0</b>"
 
-  list: "📝 Онлайн {onlineCount}: {onlinePlayers}"
-  zero-online: "📝 Онлайн 0"
+  list: "📝 <b>Онлайн {onlineCount}: {onlinePlayers}</b>"
+  zero-online: "📝 <b>Онлайн 0</b>"
 
 minecraft:
   # Messages to Minecraft templates
@@ -43,7 +43,7 @@ minecraft:
   # - {messageMeta} - message non-text data (e.g. changed chat title, sent photo, sticker or dice)
   # - {messageText} - message text or caption (chosen automatically based on what is present)
   base-message: "[{colorb}{senderName}{colorr}] {coloro}{messageMeta}{colorr}{messageText}"
-  # Notice that plugin will insert a space after each entry, so no space between {messageMeta} and {messageText} is needed
+  # Notice that plugin will insert a space after each entry, hence no space between {messageMeta} and {messageText} is needed
   # Better display newlines in texts of message and replies
   reply-newline-replacement: " / "
   message-newline-replacement: "\n> "
