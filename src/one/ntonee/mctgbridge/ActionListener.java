@@ -2,6 +2,7 @@ package one.ntonee.mctgbridge;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
+import com.pengrad.telegrambot.request.DeleteMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.EventHandler;
@@ -28,11 +29,18 @@ public class ActionListener implements Listener {
     private final Main plugin;
     private final LangConfiguration lang;
 
+    private HashMap<String, Long> lastLeaveTime;
+    private HashMap<String, Integer> lastLeaveMessageID;
+
     ActionListener(TelegramApi telegram, FileConfiguration config, Main plugin) {
         this.config = config;
         this.telegram = telegram;
         this.plugin = plugin;
         this.lang = plugin.getLangConfig();
+
+        lastLeaveTime = new HashMap<>();
+        lastLeaveMessageID = new HashMap<>();
+
         Gson gson = new Gson();
         String advancements = plugin.readResourceFile("/localization/advancements_id-en.json");
         advancementIDToData = gson.fromJson(advancements, new TypeToken<HashMap<String, AdvancementMetadata>>() {
@@ -41,7 +49,15 @@ public class ActionListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
+        telegram.actualizeListMessage();
         if (config.getBoolean("bridge-to-telegram.join-leave")) {
+            if (lastLeaveTime.getOrDefault(e.getPlayer().getName(), 0L)
+                    + config.getInt("delete-rejoin-before") * 1000L >= System.currentTimeMillis()) {
+                telegram.safeCallMethod(new DeleteMessage(
+                        config.getLong("telegram-chat-id"), lastLeaveMessageID.get(e.getPlayer().getName())
+                ));
+                return;
+            }
             String langPathJoinEvent = "telegram.player-event.join";
             if (!e.getPlayer().hasPlayedBefore()) {
                 langPathJoinEvent += "-first-time";
@@ -50,14 +66,15 @@ public class ActionListener implements Listener {
                     "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
 
         }
-        telegram.actualizeListMessage();
     }
 
     @EventHandler
     public void onLeave(PlayerQuitEvent e) {
         if (config.getBoolean("bridge-to-telegram.join-leave")) {
-            telegram.sendMessage(lang.formatString("telegram.player-event.leave",
+            int msgID = telegram.syncSendMessageForce(lang.formatString("telegram.player-event.leave",
                     "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
+            lastLeaveTime.put(e.getPlayer().getName(), System.currentTimeMillis());
+            lastLeaveMessageID.put(e.getPlayer().getName(), msgID);
         }
         Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, telegram::actualizeListMessage, 1);  // after 1 tick update list
     }

@@ -65,8 +65,9 @@ public class TelegramApi {
                             Objects.requireNonNull(lang.getString("minecraft.reply-newline-replacement")))
             ));
             if (msg.replyToMessage().from().id() == botID) {
+                int spaceIndex = substituteValues.get("replyText").indexOf(' ');
                 substituteValues.put("replyTextAfterSpace",
-                        substituteValues.get("replyText").substring(substituteValues.get("replyText").indexOf(' ')));
+                        substituteValues.get("replyText").substring((spaceIndex == -1 ? 0 : spaceIndex)));
                 result = lang.formatMessageMetaString("reply-minecraft", substituteValues);
             }
             else {
@@ -291,8 +292,8 @@ public class TelegramApi {
         sendMessageForce(toAppend);
     }
 
-    void syncSendMessageForce(String text) throws RuntimeException {
-        safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML).disableWebPagePreview(true));
+    int syncSendMessageForce(String text) throws RuntimeException {
+        return safeCallMethod(new SendMessage(chatID, text).parseMode(ParseMode.HTML).disableWebPagePreview(true)).message().messageId();
     }
 
     void sendMessageForce(String text) {

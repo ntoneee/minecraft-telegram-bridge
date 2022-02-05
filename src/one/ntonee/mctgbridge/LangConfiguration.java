@@ -17,7 +17,8 @@ record CustomStringFormatter(Map<String, String> values) {
                 return match.group(1);
             }
             // Leave value as was if not found in Map
-            return values.getOrDefault(match.group(3), match.group(2));
+            return values.getOrDefault(match.group(3), match.group(2))
+                    .replaceAll("\\\\", "\\\\\\\\").replaceAll("\\$", "\\\\\\$");
         });
     }
 }

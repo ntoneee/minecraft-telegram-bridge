@@ -5,6 +5,11 @@ telegram-admin-chat-id: -1  # Insert admin telegram chat ID here (make sure only
 telegram-list-message-id: 0  # Unless zero, updates message with that ID in the chat with actual player list
 pinned-announcement: "[Автообновляется] "
 
+# If player leaves and joins within {delete-rejoin-before} seconds, the "leave" message is removed
+# instead of posting a "join" message
+# Set to negative value to disable such behavior (it is enabled by default to prevent spamming with join messages)
+delete-rejoin-before: 30
+
 bridge-to-telegram:
   server-state:
     enable: true
