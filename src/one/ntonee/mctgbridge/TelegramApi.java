@@ -134,10 +134,15 @@ public class TelegramApi {
                 result.add(new TextComponent(lang.formatMessageMetaString("reply-minecraft", substituteValues)));
             }
             else {
+                String newlineReplacement = Objects.requireNonNull(
+                        lang.getString("minecraft.reply-newline-replacement")
+                );
                 HashMap<String, LangSubstitutionValue> substituteValues = new HashMap<>(Map.of(
                         "replySender", new LangSubstitutionValue(getTelegramUserFullName(msg.replyToMessage().from())),
                         "replyText", new LangSubstitutionValue(decomposeTelegramText(
-                                getMessageText(msg.replyToMessage()), getMessageEntities(msg.replyToMessage())
+                                getMessageText(msg.replyToMessage()),
+                                getMessageEntities(msg.replyToMessage()),
+                                newlineReplacement
                         ))
                 ));
 
@@ -250,21 +255,40 @@ public class TelegramApi {
         return text != null && (text.equalsIgnoreCase("/" + command) || text.equalsIgnoreCase("/" + command + "@" + bot_username));
     }
 
-    ArrayList<TextComponent> decomposeTelegramText(String text, MessageEntity[] entities) {
+    ArrayList<TextComponent> decomposeTelegramText(String text, MessageEntity[] entities, String newlineReplacement) {
         if (entities == null) {
             return new ArrayList<>(Collections.singleton(new TextComponent(text)));
         }
         ArrayList<TextComponent> res = new ArrayList<>();
         ArrayList<TelegramEntityEvent> events = new ArrayList<>();
+
+        int[] prefixNewlineCount = new int[text.length() + 1];
+        prefixNewlineCount[0] = 0;
+
+        for (int i = 0; i < text.length(); ++i) {
+            prefixNewlineCount[i + 1] = prefixNewlineCount[i];
+            if (text.charAt(i) == '\n') {
+                ++prefixNewlineCount[i + 1];
+            }
+        }
+
+        text = text.replace("\n", newlineReplacement);
+
         for (MessageEntity entity : entities) {
             TelegramEntityType type = TelegramEntityType.fromString(entity.type().toString());
             if (type == null) {
                 continue;
             }
             String entityData = null;
+
+            int newlineReplacementDelta = newlineReplacement.length() - 1;
+            int entity_begin = entity.offset() + prefixNewlineCount[entity.offset() + 1] * newlineReplacementDelta;
+            int entity_end = (entity.offset() + entity.length() +
+                prefixNewlineCount[entity.offset() + entity.length()] * newlineReplacementDelta);
+            
             if (type == TelegramEntityType.LINK) {
                 if (entity.type() == MessageEntity.Type.url) {
-                    entityData = text.substring(entity.offset(), entity.offset() + entity.length());
+                    entityData = text.substring(entity_begin, entity_end);
                     if (!entityData.contains("://")) {
                         entityData = "http://" + entityData;
                     }
@@ -273,17 +297,17 @@ public class TelegramApi {
                     entityData = entity.url();
                 }
                 else if (entity.type() == MessageEntity.Type.mention) {
-                    entityData = "https://t.me/" + text.substring(entity.offset() + 1, entity.offset() + entity.length());
+                    entityData = "https://t.me/" + text.substring(entity_begin + 1, entity_end);
                 }
                 else {
                     throw new RuntimeException("Unknown link entity type: " + entity.type().toString());
                 }
             }
             else if (type == TelegramEntityType.SPOILER) {
-                entityData = text.substring(entity.offset(), entity.offset() + entity.length());
+                entityData = text.substring(entity_begin, entity_end);
             }
-            events.add(new TelegramEntityEvent(entity.offset(), true, type, entityData));
-            events.add(new TelegramEntityEvent(entity.offset() + entity.length(), false, type));
+            events.add(new TelegramEntityEvent(entity_begin, true, type, entityData));
+            events.add(new TelegramEntityEvent(entity_end, false, type));
         }
         events.sort(TelegramEntityEvent::comparator);
         int eventPtr = 0;
@@ -384,7 +408,12 @@ public class TelegramApi {
                             continue;
                         }
                         String messageText = getMessageText(update.message());
-                        ArrayList<TextComponent> components = decomposeTelegramText(messageText, update.message().entities());
+                        String newlineReplacement = Objects.requireNonNull(
+                                lang.getString("minecraft.message-newline-replacement")
+                        );
+                        ArrayList<TextComponent> components = decomposeTelegramText(messageText,
+                                getMessageEntities(update.message()),
+                                newlineReplacement);
                         plugin.getServer().spigot().broadcast(lang.formatString("minecraft.base-message", Map.of(
                                 "senderName", new LangSubstitutionValue(getTelegramUserFullName(update.message().from())),
                                 "messageMeta", new LangSubstitutionValue(serializeMessageMeta(update.message())),

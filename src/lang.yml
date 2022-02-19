@@ -44,6 +44,9 @@ minecraft:
   # - {messageText} - message text or caption (chosen automatically based on what is present)
   base-message: "[{colorb}{senderName}{colorr}] {coloro}{messageMeta}{colorr}{messageText}"
   # Notice that plugin will insert a space after each entry, hence no space between {messageMeta} and {messageText} is needed
+  # Better display newlines in texts of message and replies
+  reply-newline-replacement: " / "
+  message-newline-replacement: "\n> "
   message-meta:
     # All entries will be present if applicable
 
