@@ -61,7 +61,7 @@ public class Main extends JavaPlugin {
         if (this.getConfig().getBoolean("bridge-to-telegram.server-state.disable")) {
             tg.syncSendMessageForce(lang.getString("telegram.server-state.disable"));
         }
-        tg.setListMessage(lang.formatString("telegram.announcement-message.server-disabled",
+        tg.setListMessage(lang.formatTelegramString("announcement-message.server-disabled",
                 "announcement", tg.getPinnedListAnnouncement()));
     }
 }

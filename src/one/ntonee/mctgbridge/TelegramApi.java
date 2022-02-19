@@ -3,17 +3,74 @@ package one.ntonee.mctgbridge;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.Message;
+import com.pengrad.telegrambot.model.MessageEntity;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.model.User;
 import com.pengrad.telegrambot.model.request.ChatAction;
 import com.pengrad.telegrambot.model.request.ParseMode;
 import com.pengrad.telegrambot.request.*;
 import com.pengrad.telegrambot.response.BaseResponse;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.HoverEvent;
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import java.util.*;
+
+enum TelegramEntityType {
+    BOLD,
+    ITALIC,
+    UNDERLINE,
+    STRIKETHROUGH,
+    LINK,
+    SPOILER;
+
+    static TelegramEntityType fromString(String entity) {
+        return switch (entity) {
+            case "bold" -> BOLD;
+            case "italic" -> ITALIC;
+            case "underline" -> UNDERLINE;
+            case "strikethrough" -> STRIKETHROUGH;
+            case "url", "mention", "text_link" -> LINK;
+            case "spoiler" -> SPOILER;
+            default -> null;
+        };
+    }
+}
+
+class TelegramEntityEvent {
+    public int position;
+    public boolean opening;
+    public TelegramEntityType type;
+    public String data;
+
+    TelegramEntityEvent(int position, boolean opening, TelegramEntityType type, String data) {
+        this.position = position;
+        this.opening = opening;
+        this.type = type;
+        this.data = data;
+    }
+
+    TelegramEntityEvent(int position, boolean opening, TelegramEntityType type) {
+        this.position = position;
+        this.opening = opening;
+        this.type = type;
+        this.data = null;
+    }
+
+    static int comparator(TelegramEntityEvent evt1, TelegramEntityEvent evt2) {
+        if (evt1.position != evt2.position) {
+            return (evt1.position < evt2.position ? -1 : 1);
+        }
+        if (evt1.opening != evt2.opening) {
+            return (evt1.opening ? 1 : -1);
+        }
+        return 0;
+    }
+}
 
 public class TelegramApi {
     private final TelegramBot bot;
@@ -47,55 +104,68 @@ public class TelegramApi {
         return "";
     }
 
-    private String serializeMessageMeta(Message msg) {
-        String result = "";
+    private MessageEntity[] getMessageEntities(Message message) {
+        if (message.captionEntities() != null) {
+            return message.captionEntities();
+        }
+        return message.entities();
+    }
+
+    private ArrayList<TextComponent> serializeMessageMeta(Message msg) {
+        ArrayList<TextComponent> result = new ArrayList<>();
         if (msg.forwardFrom() != null) {
-            result = lang.formatMessageMetaString("forward", "forwardFrom", getTelegramUserFullName(msg.forwardFrom()));
+            result.add(new TextComponent(lang.formatMessageMetaString("forward", "forwardFrom", getTelegramUserFullName(msg.forwardFrom()))));
         }
         else if (msg.forwardFromChat() != null) {
-            result = lang.formatMessageMetaString("forward", "forwardFrom", msg.forwardFromChat().title());
+            result.add(new TextComponent(lang.formatMessageMetaString("forward", "forwardFrom", msg.forwardFromChat().title())));
         }
         else if (msg.forwardSenderName() != null) {
-            result = lang.formatMessageMetaString("forward", "forwardFrom", msg.forwardSenderName());
+            result.add(new TextComponent(lang.formatMessageMetaString("forward", "forwardFrom", msg.forwardSenderName())));
         }
         else if (msg.replyToMessage() != null) {
-            HashMap<String, String> substituteValues = new HashMap<>(Map.of(
-                    "replySender", getTelegramUserFullName(msg.replyToMessage().from()),
-                    "replyText", getMessageText(msg.replyToMessage()).replace("\n",
-                            Objects.requireNonNull(lang.getString("minecraft.reply-newline-replacement")))
-            ));
             if (msg.replyToMessage().from().id() == botID) {
-                int spaceIndex = substituteValues.get("replyText").indexOf(' ');
-                substituteValues.put("replyTextAfterSpace",
-                        substituteValues.get("replyText").substring((spaceIndex == -1 ? 0 : spaceIndex)));
-                result = lang.formatMessageMetaString("reply-minecraft", substituteValues);
+                int spaceIndex = getMessageText(msg.replyToMessage()).indexOf(' ') + 1;
+                HashMap<String, String> substituteValues = new HashMap<>(Map.of(
+                        "replySender", getTelegramUserFullName(msg.replyToMessage().from()),
+                        "replyText", getMessageText(msg.replyToMessage()),
+                        "replyTextAfterSpace", getMessageText(msg.replyToMessage()).substring(spaceIndex)
+                ));
+                result.add(new TextComponent(lang.formatMessageMetaString("reply-minecraft", substituteValues)));
             }
             else {
-                result = lang.formatMessageMetaString("reply", substituteValues);
+                HashMap<String, LangSubstitutionValue> substituteValues = new HashMap<>(Map.of(
+                        "replySender", new LangSubstitutionValue(getTelegramUserFullName(msg.replyToMessage().from())),
+                        "replyText", new LangSubstitutionValue(decomposeTelegramText(
+                                getMessageText(msg.replyToMessage()), getMessageEntities(msg.replyToMessage())
+                        ))
+                ));
+
+                result.addAll(lang.formatString("minecraft.message-meta.reply", substituteValues));
+                result.add(new TextComponent(" "));
             }
         }
         if (msg.viaBot() != null) {
-            result += lang.formatMessageMetaString("via-bot", "viaBotUsername", msg.viaBot().username());
+            result.add(new TextComponent(lang.formatMessageMetaString("via-bot", "viaBotUsername", msg.viaBot().username())));
         }
         if (msg.poll() != null) {
-            result += lang.formatMessageMetaString("poll", "pollQuestion", msg.poll().question());
+            result.add(new TextComponent(lang.formatMessageMetaString("poll", "pollQuestion", msg.poll().question())));
         }
         if (msg.dice() != null) {
-            result += lang.formatMessageMetaString("dice", "diceValue", String.valueOf(msg.dice().value()));
+            result.add(new TextComponent(lang.formatMessageMetaString("dice", "diceValue", String.valueOf(msg.dice().value()))));
         }
-        if (msg.photo() != null) { result += lang.getMessageMetaString("photo"); }
-        if (msg.sticker() != null) { result += lang.getMessageMetaString("sticker"); }
-        if (msg.animation() != null) { result += lang.getMessageMetaString("gif"); }
-        else if (msg.document() != null) { result += lang.getMessageMetaString("file"); }
-        if (msg.audio() != null) { result += lang.getMessageMetaString("audio"); }
-        if (msg.video() != null) { result += lang.getMessageMetaString("video"); }
-        if (msg.videoNote() != null) { result += lang.getMessageMetaString("videomessage"); }
-        if (msg.voice() != null) { result += lang.getMessageMetaString("voicemessage"); }
-        if (msg.contact() != null) { result += lang.getMessageMetaString("contact"); }
-        if (msg.game() != null) { result += lang.getMessageMetaString("game"); }
-        if (msg.venue() != null) { result += lang.getMessageMetaString("venue"); }
-        if (msg.location() != null) { result += lang.getMessageMetaString("geo"); }
-        if (msg.pinnedMessage() != null) { result += lang.getMessageMetaString("pin"); }
+        if (msg.photo() != null) { result.add(new TextComponent(lang.getMessageMetaString("photo"))); }
+        if (msg.sticker() != null) { result.add(new TextComponent(lang.getMessageMetaString("sticker"))); }
+        if (msg.animation() != null) { result.add(new TextComponent(lang.getMessageMetaString("gif"))); }
+        else if (msg.document() != null) { result.add(new TextComponent(lang.getMessageMetaString("file"))); }
+        if (msg.audio() != null) { result.add(new TextComponent(lang.getMessageMetaString("audio"))); }
+        if (msg.video() != null) { result.add(new TextComponent(lang.getMessageMetaString("video"))); }
+        if (msg.videoNote() != null) { result.add(new TextComponent(lang.getMessageMetaString("videomessage"))); }
+        if (msg.voice() != null) { result.add(new TextComponent(lang.getMessageMetaString("voicemessage"))); }
+        if (msg.contact() != null) { result.add(new TextComponent(lang.getMessageMetaString("contact"))); }
+        if (msg.game() != null) { result.add(new TextComponent(lang.getMessageMetaString("game"))); }
+        if (msg.venue() != null) { result.add(new TextComponent(lang.getMessageMetaString("venue"))); }
+        if (msg.location() != null) { result.add(new TextComponent(lang.getMessageMetaString("geo"))); }
+        if (msg.pinnedMessage() != null) { result.add(new TextComponent(lang.getMessageMetaString("pin"))); }
         if (msg.newChatMembers() != null) {
             ArrayList<String> names = new ArrayList<>();
             for (User user : msg.newChatMembers()) {
@@ -104,26 +174,26 @@ public class TelegramApi {
             String joint_names = String.join(",", names);
 
             if (msg.newChatMembers().length == 1) {
-                result += lang.formatMessageMetaString("invite-one", "userInvited", joint_names);
+                result.add(new TextComponent(lang.formatMessageMetaString("invite-one", "userInvited", joint_names)));
             }
             else {
-                result += lang.formatMessageMetaString("invite-many", "usersInvited", joint_names);
+                result.add(new TextComponent(lang.formatMessageMetaString("invite-many", "usersInvited", joint_names)));
             }
         }
         if (msg.newChatTitle() != null) {
-            result += lang.formatMessageMetaString("change-title", "newTitle", msg.newChatTitle());
+            result.add(new TextComponent(lang.formatMessageMetaString("change-title", "newTitle", msg.newChatTitle())));
         }
         if (msg.newChatPhoto() != null) {
-            result += lang.getMessageMetaString("change-photo");
+            result.add(new TextComponent(lang.getMessageMetaString("change-photo")));
         }
         if (msg.voiceChatScheduled() != null) {
-            result += lang.getMessageMetaString("schedule-voice-chat");
+            result.add(new TextComponent(lang.getMessageMetaString("schedule-voice-chat")));
         }
         if (msg.voiceChatStarted() != null) {
-            result += lang.getMessageMetaString("start-voice-chat");
+            result.add(new TextComponent(lang.getMessageMetaString("start-voice-chat")));
         }
         if (msg.voiceChatEnded() != null) {
-            result += lang.getMessageMetaString("finish-voice-chat");
+            result.add(new TextComponent(lang.getMessageMetaString("finish-voice-chat")));
         }
         if (msg.voiceChatParticipantsInvited() != null) {
             ArrayList<String> names = new ArrayList<>();
@@ -133,10 +203,10 @@ public class TelegramApi {
             String joint_names = String.join(",", names);
 
             if (names.size() == 1) {
-                result += lang.formatMessageMetaString("invite-one-voice-chat", "userInvited", joint_names);
+                result.add(new TextComponent(lang.formatMessageMetaString("invite-one-voice-chat", "userInvited", joint_names)));
             }
             else {
-                result += lang.formatMessageMetaString("invite-many-voice-chat", "usersInvited", joint_names);
+                result.add(new TextComponent(lang.formatMessageMetaString("invite-many-voice-chat", "usersInvited", joint_names)));
             }
         }
         return result;
@@ -155,20 +225,20 @@ public class TelegramApi {
         String joint_names = names.toString();
         if (player_cnt == 0) {
             if (includeAnnouncement) {
-                return lang.formatString("telegram.announcement-message.server-enabled-zero-online",
+                return lang.formatTelegramString("announcement-message.server-enabled-zero-online",
                         "announcement", pinnedListAnnouncement);
             }
             return lang.getString("telegram.zero-online");
         }
         if (includeAnnouncement) {
-            return lang.formatString("telegram.announcement-message.server-enabled", Map.of(
+            return lang.formatTelegramString("announcement-message.server-enabled", Map.of(
                     "announcement", pinnedListAnnouncement,
                     "onlineCount", String.valueOf(player_cnt),
                     "onlinePlayers", joint_names
             ));
         }
         else {
-            return lang.formatString("telegram.list", Map.of(
+            return lang.formatTelegramString("list", Map.of(
                     "onlineCount", String.valueOf(player_cnt),
                     "onlinePlayers", joint_names
             ));
@@ -177,6 +247,104 @@ public class TelegramApi {
 
     boolean checkForCommand(String text, String command) {
         return text != null && (text.equalsIgnoreCase("/" + command) || text.equalsIgnoreCase("/" + command + "@" + bot_username));
+    }
+
+    ArrayList<TextComponent> decomposeTelegramText(String text, MessageEntity[] entities) {
+        if (entities == null) {
+            return new ArrayList<>(Collections.singleton(new TextComponent(text)));
+        }
+        ArrayList<TextComponent> res = new ArrayList<>();
+        ArrayList<TelegramEntityEvent> events = new ArrayList<>();
+        for (MessageEntity entity : entities) {
+            TelegramEntityType type = TelegramEntityType.fromString(entity.type().toString());
+            if (type == null) {
+                continue;
+            }
+            String entityData = null;
+            if (type == TelegramEntityType.LINK) {
+                if (entity.type() == MessageEntity.Type.url) {
+                    entityData = text.substring(entity.offset(), entity.offset() + entity.length());
+                    if (!entityData.contains("://")) {
+                        entityData = "http://" + entityData;
+                    }
+                }
+                else if (entity.type() == MessageEntity.Type.text_link) {
+                    entityData = entity.url();
+                }
+                else if (entity.type() == MessageEntity.Type.mention) {
+                    entityData = "https://t.me/" + text.substring(entity.offset() + 1, entity.offset() + entity.length());
+                }
+                else {
+                    throw new RuntimeException("Unknown link entity type: " + entity.type().toString());
+                }
+            }
+            else if (type == TelegramEntityType.SPOILER) {
+                entityData = text.substring(entity.offset(), entity.offset() + entity.length());
+            }
+            events.add(new TelegramEntityEvent(entity.offset(), true, type, entityData));
+            events.add(new TelegramEntityEvent(entity.offset() + entity.length(), false, type));
+        }
+        events.sort(TelegramEntityEvent::comparator);
+        int eventPtr = 0;
+        StringBuilder lastTextComponent = new StringBuilder();
+        TextComponent formatting = new TextComponent("used for preserving style");
+        boolean underlineEntity = false, linkEntity = false;
+        for (int i = 0; i < text.length(); ++i) {
+            boolean styleChanged = false;
+            TextComponent oldFormatting = new TextComponent(formatting);
+            while (eventPtr < events.size() && events.get(eventPtr).position == i) {
+                styleChanged = true;
+                TelegramEntityEvent curEvent = events.get(eventPtr);
+                if (curEvent.type == TelegramEntityType.BOLD) {
+                    formatting.setBold(curEvent.opening ? true : null);
+                }
+                else if (curEvent.type == TelegramEntityType.ITALIC) {
+                    formatting.setItalic(curEvent.opening ? true : null);
+                }
+                else if (curEvent.type == TelegramEntityType.UNDERLINE) {
+                    underlineEntity = curEvent.opening;
+                    formatting.setUnderlined(underlineEntity || linkEntity ? true : null);
+                }
+                else if (curEvent.type == TelegramEntityType.STRIKETHROUGH) {
+                    formatting.setStrikethrough(curEvent.opening ? true : null);
+                }
+                else if (curEvent.type == TelegramEntityType.LINK) {
+                    linkEntity = curEvent.opening;
+                    formatting.setUnderlined(underlineEntity || linkEntity ? true : null);
+                    if (curEvent.opening) {
+                        formatting.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, curEvent.data));
+                    }
+                    else {
+                        formatting.setClickEvent(null);
+                    }
+                }
+                else if (curEvent.type == TelegramEntityType.SPOILER) {
+                    formatting.setObfuscated(curEvent.opening);
+                    if (curEvent.opening) {
+                        formatting.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(curEvent.data)));
+                    }
+                    else {
+                        formatting.setHoverEvent(null);
+                    }
+                }
+                else {
+                    throw new RuntimeException("Unknown curEvent type while decomposing message: " + curEvent.type);
+                }
+                ++eventPtr;
+            }
+            if (styleChanged) {
+                TextComponent toAdd = new TextComponent(lastTextComponent.toString());
+                lastTextComponent = new StringBuilder();
+                toAdd.copyFormatting(oldFormatting);
+                toAdd.setHoverEvent(oldFormatting.getHoverEvent());
+                toAdd.setClickEvent(oldFormatting.getClickEvent());
+                res.add(toAdd);
+            }
+            lastTextComponent.append(text.charAt(i));
+        }
+        formatting.setText(lastTextComponent.toString());
+        res.add(formatting);
+        return res;
     }
 
     TelegramApi(FileConfiguration config, Main plugin) throws RuntimeException {
@@ -202,21 +370,25 @@ public class TelegramApi {
                     "Error description: " + resp.errorCode() + " " + resp.description());
         }
         bot_username = safeCallMethod(new GetMe()).user().username();
+        long startupDate = System.currentTimeMillis() / 1000;
         bot.setUpdatesListener(updates -> {
             for (Update update : updates) {
                 if (update.message() != null) {
+                    if (update.message().date() < startupDate) {
+                        continue;
+                    }
                     if (update.message().chat().id() == chatID) {
                         if (checkForCommand(update.message().text(), "list")) {
                             sendMessage(getListMessage(false));
                             continue;
                         }
-                        Bukkit.broadcastMessage(lang.formatString("minecraft.base-message", Map.of(
-                                "senderName", getTelegramUserFullName(update.message().from()),
-                                "messageMeta", serializeMessageMeta(update.message()),
-                                "messageText",
-                                getMessageText(update.message()).replace("\n",
-                                        lang.getString("minecraft.message-newline-replacement"))
-                        )));
+                        String messageText = getMessageText(update.message());
+                        ArrayList<TextComponent> components = decomposeTelegramText(messageText, update.message().entities());
+                        plugin.getServer().spigot().broadcast(lang.formatString("minecraft.base-message", Map.of(
+                                "senderName", new LangSubstitutionValue(getTelegramUserFullName(update.message().from())),
+                                "messageMeta", new LangSubstitutionValue(serializeMessageMeta(update.message())),
+                                "messageText", new LangSubstitutionValue(components)
+                        )).toArray(new TextComponent[0]));
                     }
                     else if (update.message().chat().id() == adminChatID && update.message().text() != null) {
                         String[] split = update.message().text().split("\\s+", 2);

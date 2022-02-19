@@ -58,11 +58,11 @@ public class ActionListener implements Listener {
                 ));
                 return;
             }
-            String langPathJoinEvent = "telegram.player-event.join";
+            String langPathJoinEvent = "player-event.join";
             if (!e.getPlayer().hasPlayedBefore()) {
                 langPathJoinEvent += "-first-time";
             }
-            telegram.sendMessage(lang.formatString(langPathJoinEvent,
+            telegram.sendMessage(lang.formatTelegramString(langPathJoinEvent,
                     "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
 
         }
@@ -71,7 +71,7 @@ public class ActionListener implements Listener {
     @EventHandler
     public void onLeave(PlayerQuitEvent e) {
         if (config.getBoolean("bridge-to-telegram.join-leave")) {
-            int msgID = telegram.syncSendMessageForce(lang.formatString("telegram.player-event.leave",
+            int msgID = telegram.syncSendMessageForce(lang.formatTelegramString("player-event.leave",
                     "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
             lastLeaveTime.put(e.getPlayer().getName(), System.currentTimeMillis());
             lastLeaveMessageID.put(e.getPlayer().getName(), msgID);
@@ -84,7 +84,7 @@ public class ActionListener implements Listener {
         if (!config.getBoolean("bridge-to-telegram.messages")) {
             return;
         }
-        telegram.sendMessage(lang.formatString("telegram.player-event.message", Map.of(
+        telegram.sendMessage(lang.formatTelegramString("player-event.message", Map.of(
                 "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName()),
                 "message", telegram.escapeText(e.getMessage())
         )));
@@ -99,7 +99,7 @@ public class ActionListener implements Listener {
         if (deathMessage == null) {  // Fallback, since getDeathMessage is nullable. No known way to reproduce null.
             deathMessage = e.getEntity().getDisplayName() + " died";
         }
-        telegram.sendMessage(lang.formatString("telegram.player-event.death", "deathMessage", deathMessage));
+        telegram.sendMessage(lang.formatTelegramString("player-event.death", "deathMessage", deathMessage));
     }
 
     @EventHandler
@@ -112,7 +112,7 @@ public class ActionListener implements Listener {
         if (!config.getBoolean("bridge-to-telegram.advancements." + advancement.type)) {
             return;
         }
-        String message = lang.formatString("telegram.player-event.advancement." + advancement.type, Map.of(
+        String message = lang.formatTelegramString("player-event.advancement." + advancement.type, Map.of(
                 "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName()),
                 "advancementTitle", telegram.escapeText(advancement.title),
                 "advancementDescription", telegram.escapeText(advancement.description)
