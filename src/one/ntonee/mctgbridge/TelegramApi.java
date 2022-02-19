@@ -15,6 +15,7 @@ import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Bukkit;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
@@ -385,6 +386,11 @@ public class TelegramApi {
                         String messageText = getMessageText(update.message());
                         ArrayList<TextComponent> components = decomposeTelegramText(messageText, update.message().entities());
                         plugin.getServer().spigot().broadcast(lang.formatString("minecraft.base-message", Map.of(
+                                "senderName", new LangSubstitutionValue(getTelegramUserFullName(update.message().from())),
+                                "messageMeta", new LangSubstitutionValue(serializeMessageMeta(update.message())),
+                                "messageText", new LangSubstitutionValue(components)
+                        )).toArray(new TextComponent[0]));
+                        plugin.getServer().getConsoleSender().spigot().sendMessage(lang.formatString("minecraft.base-message", Map.of(
                                 "senderName", new LangSubstitutionValue(getTelegramUserFullName(update.message().from())),
                                 "messageMeta", new LangSubstitutionValue(serializeMessageMeta(update.message())),
                                 "messageText", new LangSubstitutionValue(components)
