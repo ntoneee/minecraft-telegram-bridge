@@ -32,11 +32,19 @@ public class Main extends JavaPlugin {
         File langConfigFile = new File(getDataFolder(), "lang.yml");
         if (!langConfigFile.exists()) {
             langConfigFile.getParentFile().mkdirs();
-            String content = readResourceFile("/lang.yml");
             langConfigFile.createNewFile();
-            Files.write(Paths.get(langConfigFile.getAbsolutePath()), Collections.singleton(content), StandardCharsets.UTF_8);
         }
-        return YamlConfiguration.loadConfiguration(langConfigFile);
+        String content = readResourceFile("/lang.yml");
+        YamlConfiguration pluginConfig = new YamlConfiguration();
+        pluginConfig.loadFromString(content);
+        YamlConfiguration userConfig = YamlConfiguration.loadConfiguration(langConfigFile);
+        for (String key : pluginConfig.getKeys(true)) {
+            if (!userConfig.contains(key)) {
+                userConfig.set(key, pluginConfig.get(key));
+            }
+        }
+        userConfig.save(langConfigFile);
+        return userConfig;
     }
 
     @Override
