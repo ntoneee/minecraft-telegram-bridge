@@ -467,14 +467,14 @@ public class TelegramApi {
         if (listMessageID != 0) {
             String nowList = getListMessage(true);
             if (Objects.equals(nowList, previousPinnedListContent)) return;
-            asyncSafeCallMethod(new EditMessageText(chatID, listMessageID, nowList).parseMode(ParseMode.HTML));
+            asyncSafeCallMethod(new EditMessageText(chatID, listMessageID, nowList).parseMode(ParseMode.HTML).disableWebPagePreview(true));
             previousPinnedListContent = nowList;
         }
     }
 
     void setListMessage(String text) throws RuntimeException {
         if (listMessageID != 0 && !Objects.equals(text, previousPinnedListContent)) {
-            EditMessageText request = new EditMessageText(chatID, listMessageID, text).parseMode(ParseMode.HTML);
+            EditMessageText request = new EditMessageText(chatID, listMessageID, text).parseMode(ParseMode.HTML).disableWebPagePreview(true);
             if (plugin.isEnabled()) {
                 asyncSafeCallMethod(request);
             }
