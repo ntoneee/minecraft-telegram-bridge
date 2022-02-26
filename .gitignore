@@ -1,6 +1,5 @@
 /.idea/
-/lib/
-/out/
+/build
+/.gradle
 /src/META-INF/
 
-/mctg-bridge.iml
