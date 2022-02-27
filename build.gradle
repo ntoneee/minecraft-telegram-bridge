@@ -6,7 +6,6 @@ plugins {
 group = "one.ntonee.mctgbridge"
 version = "2.0"
 
-
 repositories {
     maven {
         mavenCentral()
@@ -16,10 +15,11 @@ repositories {
             includeGroup 'org.spigotmc'
         }
     }
+    mavenCentral()
 }
 
 dependencies {
     compileOnly 'org.spigotmc:spigot-api:1.18-R0.1-SNAPSHOT'
-    compileOnly 'com.google.gson:2.8.6'
+    implementation 'com.google.code.gson:gson:2.9.0'
     implementation 'com.github.pengrad:java-telegram-bot-api:5.6.0'
 }
