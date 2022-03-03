@@ -24,6 +24,6 @@ jobs:
       uses: actions/upload-artifact@v2.3.1
       with:
         name: mctgbridge-jar
-        path: build/libs/mctg-bridge-*.jar
+        path: build/libs/*.jar
         if-no-files-found: warn
         retention-days: 30
