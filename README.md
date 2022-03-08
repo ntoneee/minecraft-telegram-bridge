@@ -6,6 +6,7 @@
 ![Пример (игра)](guide/assets/minecraft_hello_world.png)
 ![Пример (Telegram)](guide/assets/telegram_hello_world.png)
 
+_Плагин не работает с серверами на Forge, Fabric и официальном ядре Minecraft. Он совместим с серверами, которые поддерживают плагины под Spigot, например, Spigot, Paper или Purpur._
 
 ## Установка
 Плагин совместим с Spigot-совместимыми серверными ядрами, например Spigot, Paper, Purpur.
