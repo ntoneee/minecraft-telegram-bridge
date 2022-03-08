@@ -11,7 +11,7 @@ _Плагин не работает с серверами на Forge, Fabric и 
 ## Установка
 Плагин совместим с Spigot-совместимыми серверными ядрами, например Spigot, Paper, Purpur.
 
-Скачайте последнюю версию из Releases (файл `minecraft-telegram-bridge-{версия}-all.jar`) и скопируйте в папку `plugins/` вашего сервера. 
+Скачайте последнюю версию из [Releases](https://github.com/ntoneee/minecraft-telegram-bridge/releases) (файл `minecraft-telegram-bridge-{версия}-all.jar`) и скопируйте в папку `plugins/` вашего сервера. 
 
 ## Настройка
 Для настройки плагина используются 2 файла в папке `plugins/Minecraft-Telegram_Bridge`:
