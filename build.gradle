@@ -8,7 +8,6 @@ version = "2.0"
 
 repositories {
     maven {
-        mavenCentral()
         url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
         content {
             includeGroup 'org.bukkit'
