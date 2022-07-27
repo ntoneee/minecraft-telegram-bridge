@@ -71,7 +71,7 @@ public class ActionListener implements Listener {
     @EventHandler
     public void onLeave(PlayerQuitEvent e) {
         if (config.getBoolean("bridge-to-telegram.join-leave")) {
-            int msgID = telegram.syncSendMessageForce(lang.formatTelegramString("player-event.leave",
+            int msgID = telegram.sendMessage(lang.formatTelegramString("player-event.leave",
                     "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
             lastLeaveTime.put(e.getPlayer().getName(), System.currentTimeMillis());
             lastLeaveMessageID.put(e.getPlayer().getName(), msgID);
