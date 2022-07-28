@@ -15,6 +15,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 class AdvancementMetadata {
     String title;
@@ -24,13 +25,21 @@ class AdvancementMetadata {
 
 public class ActionListener implements Listener {
     private final TelegramApi telegram;
-    private HashMap<String, AdvancementMetadata> advancementIDToData;
+    private final HashMap<String, AdvancementMetadata> advancementIDToData;
     private final FileConfiguration config;
     private final Main plugin;
     private final LangConfiguration lang;
 
-    private HashMap<String, Long> lastLeaveTime;
-    private HashMap<String, Integer> lastLeaveMessageID;
+    private final HashMap<String, Long> lastLeaveTime;
+    private final HashMap<String, Integer> lastLeaveMessageID;
+    private final HashMap<String, ReentrantLock> playerLocks;
+
+    synchronized ReentrantLock getPlayerLock(String username) {
+        if (!playerLocks.containsKey(username)) {
+            playerLocks.put(username, new ReentrantLock());
+        }
+        return playerLocks.get(username);
+    }
 
     ActionListener(TelegramApi telegram, FileConfiguration config, Main plugin) {
         this.config = config;
@@ -40,6 +49,7 @@ public class ActionListener implements Listener {
 
         lastLeaveTime = new HashMap<>();
         lastLeaveMessageID = new HashMap<>();
+        playerLocks = new HashMap<>();
 
         Gson gson = new Gson();
         String advancements = plugin.readResourceFile("/localization/advancements_id-en.json");
@@ -51,20 +61,31 @@ public class ActionListener implements Listener {
     public void onJoin(PlayerJoinEvent e) {
         telegram.actualizeListMessage();
         if (config.getBoolean("bridge-to-telegram.join-leave")) {
-            if (lastLeaveTime.getOrDefault(e.getPlayer().getName(), 0L)
-                    + config.getInt("delete-rejoin-before") * 1000L >= System.currentTimeMillis()) {
-                telegram.safeCallMethod(new DeleteMessage(
-                        config.getLong("telegram-chat-id"), lastLeaveMessageID.get(e.getPlayer().getName())
-                ));
-                return;
-            }
-            String langPathJoinEvent = "player-event.join";
-            if (!e.getPlayer().hasPlayedBefore()) {
-                langPathJoinEvent += "-first-time";
-            }
-            telegram.sendMessage(lang.formatTelegramString(langPathJoinEvent,
-                    "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
-
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                String username = e.getPlayer().getName();
+                ReentrantLock lock = getPlayerLock(username);
+                try {
+                    lock.lock();
+                    if (lastLeaveTime.getOrDefault(username, 0L)
+                            + config.getInt("delete-rejoin-before") * 1000L >= System.currentTimeMillis()) {
+                        telegram.safeCallMethod(new DeleteMessage(
+                                config.getLong("telegram-chat-id"), lastLeaveMessageID.get(username)
+                        ));
+                        return;
+                    }
+                    String langPathJoinEvent = "player-event.join";
+                    if (!e.getPlayer().hasPlayedBefore()) {
+                        langPathJoinEvent += "-first-time";
+                    }
+                    telegram.sendMessage(lang.formatTelegramString(langPathJoinEvent,
+                            "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
+                }
+                finally {
+                    if (lock.isHeldByCurrentThread()) {
+                        lock.unlock();
+                    }
+                }
+            });
         }
     }
 
@@ -72,12 +93,22 @@ public class ActionListener implements Listener {
     public void onLeave(PlayerQuitEvent e) {
         if (config.getBoolean("bridge-to-telegram.join-leave")) {
             Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                Long curTime = System.currentTimeMillis();
-                if (lastLeaveTime.getOrDefault(e.getPlayer().getName(), 0L) < curTime) {
-                    lastLeaveTime.put(e.getPlayer().getName(), curTime);
-                    int msgID = telegram.syncSendMessageForce(lang.formatTelegramString("player-event.leave",
-                            "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
-                    lastLeaveMessageID.put(e.getPlayer().getName(), msgID);
+                String username = e.getPlayer().getName();
+                ReentrantLock lock = getPlayerLock(username);
+                try {
+                    lock.lock();
+                    Long curTime = System.currentTimeMillis();
+                    if (lastLeaveTime.getOrDefault(username, 0L) < curTime) {
+                        lastLeaveTime.put(username, curTime);
+                        int msgID = telegram.syncSendMessageForce(lang.formatTelegramString("player-event.leave",
+                                "userDisplayName", telegram.escapeText(e.getPlayer().getDisplayName())));
+                        lastLeaveMessageID.put(username, msgID);
+                    }
+                }
+                finally {
+                    if (lock.isHeldByCurrentThread()) {
+                        lock.unlock();
+                    }
                 }
             });
         }
