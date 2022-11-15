@@ -23,7 +23,7 @@ public class Main extends JavaPlugin {
 
     public String readResourceFile(String path) {
         InputStream idJSONStream = Objects.requireNonNull(getClass().getResourceAsStream(path));
-        InputStreamReader reader = new InputStreamReader(idJSONStream);
+        InputStreamReader reader = new InputStreamReader(idJSONStream, StandardCharsets.UTF_8);
         BufferedReader buf = new BufferedReader(reader);
         return buf.lines().collect(Collectors.joining("\n"));
     }
